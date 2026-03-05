@@ -107,9 +107,9 @@ jobs:
           cd ..\..
 
           if exist "%APP_DATA%" rmdir /s /q "%APP_DATA%"
-          mkdir "%APP_DATA%"
+          mkdir "%APP_DATA%\%CLEAN_VERSION%"
 
-          xcopy /s /e /y /q "build\release\*" "%APP_DATA%\" >nul
+          xcopy /s /e /y /q "build\release\*" "%APP_DATA%\%CLEAN_VERSION%\" >nul
 
       - name: Update Package Versions
         shell: powershell
@@ -265,10 +265,10 @@ jobs:
           APP_DATA="installer/packages/com.redline.minervastation.app/data"
 
           rm -rf "$APP_DATA"
-          mkdir -p "$APP_DATA"
+          mkdir -p "$APP_DATA/$CLEAN_VERSION"
 
           if [ -d "build/MinervaStation.app" ]; then
-            cp -R "build/MinervaStation.app" "$APP_DATA/"
+            cp -R "build/MinervaStation.app" "$APP_DATA/$CLEAN_VERSION/"
           fi
 
       - name: Update Package Versions
@@ -381,16 +381,16 @@ jobs:
           APP_DATA="installer/packages/com.redline.minervastation.app/data"
 
           rm -rf "$APP_DATA"
-          mkdir -p "$APP_DATA"
+          mkdir -p "$APP_DATA/$CLEAN_VERSION"
 
-          [ -f "build/MinervaStation" ] && cp "build/MinervaStation" "$APP_DATA/MinervaStation" && chmod +x "$APP_DATA/MinervaStation"
+          [ -f "build/MinervaStation" ] && cp "build/MinervaStation" "$APP_DATA/$CLEAN_VERSION/MinervaStation" && chmod +x "$APP_DATA/$CLEAN_VERSION/MinervaStation"
 
           if [ -n "$QT_PATH" ] && [ -d "$QT_PATH/lib" ]; then
-            mkdir -p "$APP_DATA/lib" "$APP_DATA/plugins/platforms"
+            mkdir -p "$APP_DATA/$CLEAN_VERSION/lib" "$APP_DATA/$CLEAN_VERSION/plugins/platforms"
             for lib in Core Gui Widgets Network; do
-              [ -f "$QT_PATH/lib/libQt6${lib}.so.6" ] && cp "$QT_PATH/lib/libQt6${lib}.so.6" "$APP_DATA/lib/"
+              [ -f "$QT_PATH/lib/libQt6${lib}.so.6" ] && cp "$QT_PATH/lib/libQt6${lib}.so.6" "$APP_DATA/$CLEAN_VERSION/lib/"
             done
-            [ -d "$QT_PATH/plugins/platforms" ] && cp "$QT_PATH/plugins/platforms/"*.so "$APP_DATA/plugins/platforms/" 2>/dev/null || true
+            [ -d "$QT_PATH/plugins/platforms" ] && cp "$QT_PATH/plugins/platforms/"*.so "$APP_DATA/$CLEAN_VERSION/plugins/platforms/" 2>/dev/null || true
           fi
 
       - name: Update Package Versions
