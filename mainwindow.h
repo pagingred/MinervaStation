@@ -6,6 +6,7 @@
 
 #include <QMainWindow>
 #include <QElapsedTimer>
+#include <QHash>
 #include <QMap>
 #include <QPixmap>
 
@@ -13,6 +14,7 @@ class QTimer;
 class QNetworkAccessManager;
 class QJsonArray;
 class QProgressBar;
+class QTableWidgetItem;
 class SystemProfiler;
 
 namespace Ui
@@ -58,6 +60,7 @@ private:
     void AddFinishedRow(int aFileId, const JobState &aState);
     void SyncQueueColumns();
     void AppendLog(const QString &aMsg);
+    void FlushLogMessages();
 
     void LbAppendPageData(const QJsonArray &aRows, int aPage);
     void LbRefreshDisplay();
@@ -77,6 +80,11 @@ private:
 
     QMap<int, QProgressBar*> mProgressBars;
     QMap<int, QPair<qint64, JobState>> mPendingRemovals;
+
+    int mQueuedUploadCount = 0;
+    int mQueuedDownloadCount = 0;
+    QHash<int, QTableWidgetItem*> mUploadRowIndex;
+    QHash<int, QTableWidgetItem*> mDownloadRowIndex;
 
     int mFinishedDoneCount = 0;
     int mFinishedFailCount = 0;
@@ -111,11 +119,14 @@ private:
 
     QElapsedTimer mUiClock;
     QMap<int, qint64> mLastUiUpdate;
-    qint64 mUiUpdateIntervalMs = 50;
+    qint64 mUiUpdateIntervalMs = 250;
 
     QHash<int, JobState> mPendingJobStates;
     QTimer *mFlushTimer = nullptr;
     void FlushJobUpdates();
+
+    QStringList mPendingLogMessages;
+    QTimer *mLogFlushTimer = nullptr;
 };
 
 #endif // MAINWINDOW_H

@@ -60,6 +60,7 @@ static QString fmtBytes(qint64 aBytes)
 
 MainWindow::~MainWindow()
 {
+    mWorker->Stop();   // must stop before child timers are destroyed
     delete ui;
 }
 
@@ -125,6 +126,10 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
     mFlushTimer->setSingleShot(true);
     connect(mFlushTimer, &QTimer::timeout, this, &MainWindow::FlushJobUpdates);
 
+    mLogFlushTimer = new QTimer(this);
+    mLogFlushTimer->setSingleShot(true);
+    connect(mLogFlushTimer, &QTimer::timeout, this, &MainWindow::FlushLogMessages);
+
     connect(mWorker, &MinervaWorker::JobUpdated, this, [this](int aFileId, const JobState &aState)
             {
                 if (aState.phase == JobPhase::Downloading)
@@ -158,16 +163,25 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
 
     connect(mWorker, &MinervaWorker::JobRemoved, this, [this](int aFileId)
             {
-                for (QTableWidget *table : {ui->mUploadTable, ui->mDownloadTable})
+                if (mUploadRowIndex.contains(aFileId))
                 {
-                    for (int r = 0; r < table->rowCount(); ++r)
+                    ui->mUploadTable->removeRow(mUploadRowIndex.value(aFileId)->row());
+                    mUploadRowIndex.remove(aFileId);
+                }
+                else if (mDownloadRowIndex.contains(aFileId))
+                {
+                    ui->mDownloadTable->removeRow(mDownloadRowIndex.value(aFileId)->row());
+                    mDownloadRowIndex.remove(aFileId);
+                }
+                else
+                {
+                    if (mQueuedUploadCount > 0)
                     {
-                        if (table->item(r, 0) &&
-                            table->item(r, 0)->data(Qt::UserRole).toInt() == aFileId)
-                        {
-                            table->removeRow(r);
-                            break;
-                        }
+                        --mQueuedUploadCount;
+                    }
+                    else if (mQueuedDownloadCount > 0)
+                    {
+                        --mQueuedDownloadCount;
                     }
                 }
                 mProgressBars.remove(aFileId);
@@ -211,7 +225,7 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
         cfg.aria2cConnections = ui->mAria2cConns->value();
         cfg.downloadRetryDelaySec = ui->mDownloadRetryDelay->value();
         cfg.uploadRetryDelaySec = ui->mUploadRetryDelay->value();
-        cfg.diskReserveBytes = static_cast<qint64>(ui->mDiskReserveMb->value()) * 1024 * 1024;
+        cfg.diskReserveBytes = static_cast<qint64>(ui->mDiskReserveGb->value()) * 1024LL * 1024 * 1024;
         cfg.reportRetries = ui->mReportRetries->value();
         cfg.queuePrefetch = ui->mQueuePrefetch->value();
         cfg.uploadChunkSize = static_cast<qint64>(ui->mUploadChunkSizeMb->value()) * 1024 * 1024;
@@ -228,7 +242,7 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
     connect(ui->mAria2cConns,   QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
     connect(ui->mDownloadRetryDelay, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
     connect(ui->mUploadRetryDelay, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mDiskReserveMb, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
+    connect(ui->mDiskReserveGb, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
     connect(ui->mReportRetries, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
     connect(ui->mQueuePrefetch, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
     connect(ui->mUploadChunkSizeMb, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
@@ -344,48 +358,90 @@ void MainWindow::FlushJobUpdates()
         int aFileId = it.key();
         const JobState &aState = it.value();
 
-        bool isUploadPhase = (aState.phase == JobPhase::QueuedUpload ||
-                              aState.phase == JobPhase::Uploading ||
-                              aState.phase == JobPhase::UploadRetryWait ||
-                              aState.phase == JobPhase::Reporting);
-
-        QTableWidget *targetTable = isUploadPhase ? ui->mUploadTable : ui->mDownloadTable;
-        QTableWidget *otherTable = isUploadPhase ? ui->mDownloadTable : ui->mUploadTable;
-
-        if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
+        // Skip queued items — track with counters only
+        if (aState.phase == JobPhase::QueuedUpload)
         {
-            for (int r = 0; r < ui->mUploadTable->rowCount(); ++r)
+            if (!mUploadRowIndex.contains(aFileId))
             {
-                if (ui->mUploadTable->item(r, 0) &&
-                    ui->mUploadTable->item(r, 0)->data(Qt::UserRole).toInt() == aFileId)
+                ++mQueuedUploadCount;
+            }
+            continue;
+        }
+        if (aState.phase == JobPhase::Queued)
+        {
+            if (!mDownloadRowIndex.contains(aFileId))
+            {
+                ++mQueuedDownloadCount;
+            }
+            continue;
+        }
+
+        // Item transitioning out of queued state — decrement counter
+        if (!mUploadRowIndex.contains(aFileId) && !mDownloadRowIndex.contains(aFileId))
+        {
+            if (aState.phase == JobPhase::Uploading ||
+                aState.phase == JobPhase::UploadRetryWait ||
+                aState.phase == JobPhase::Reporting)
+            {
+                if (mQueuedUploadCount > 0)
                 {
-                    targetTable = ui->mUploadTable;
-                    otherTable = ui->mDownloadTable;
-                    break;
+                    --mQueuedUploadCount;
+                }
+            }
+            else if (aState.phase == JobPhase::Downloading)
+            {
+                if (mQueuedDownloadCount > 0)
+                {
+                    --mQueuedDownloadCount;
+                }
+            }
+            else if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
+            {
+                if (mQueuedUploadCount > 0)
+                {
+                    --mQueuedUploadCount;
+                }
+                else if (mQueuedDownloadCount > 0)
+                {
+                    --mQueuedDownloadCount;
                 }
             }
         }
 
-        for (int r = 0; r < otherTable->rowCount(); ++r)
+        bool isUploadPhase = (aState.phase == JobPhase::Uploading ||
+                              aState.phase == JobPhase::UploadRetryWait ||
+                              aState.phase == JobPhase::Reporting);
+
+        QTableWidget *targetTable = isUploadPhase ? ui->mUploadTable : ui->mDownloadTable;
+        QHash<int, QTableWidgetItem*> *targetIndex = isUploadPhase ? &mUploadRowIndex : &mDownloadRowIndex;
+        QTableWidget *otherTable = isUploadPhase ? ui->mDownloadTable : ui->mUploadTable;
+        QHash<int, QTableWidgetItem*> *otherIndex = isUploadPhase ? &mDownloadRowIndex : &mUploadRowIndex;
+
+        if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
         {
-            if (otherTable->item(r, 0) &&
-                otherTable->item(r, 0)->data(Qt::UserRole).toInt() == aFileId)
+            if (mUploadRowIndex.contains(aFileId))
             {
-                mProgressBars.remove(aFileId);
-                otherTable->removeRow(r);
-                break;
+                targetTable = ui->mUploadTable;
+                targetIndex = &mUploadRowIndex;
+                otherTable = ui->mDownloadTable;
+                otherIndex = &mDownloadRowIndex;
             }
         }
 
-        int row = -1;
-        for (int r = 0; r < targetTable->rowCount(); ++r)
+        // Remove from other table via hash lookup
+        if (otherIndex->contains(aFileId))
         {
-            if (targetTable->item(r, 0) &&
-                targetTable->item(r, 0)->data(Qt::UserRole).toInt() == aFileId)
-            {
-                row = r;
-                break;
-            }
+            int otherRow = otherIndex->value(aFileId)->row();
+            mProgressBars.remove(aFileId);
+            otherTable->removeRow(otherRow);
+            otherIndex->remove(aFileId);
+        }
+
+        // Find existing row via hash lookup
+        int row = -1;
+        if (targetIndex->contains(aFileId))
+        {
+            row = targetIndex->value(aFileId)->row();
         }
 
         int newKey = PhaseColors::SortKey(aState.phase, aState.progress, aState.total);
@@ -396,6 +452,7 @@ void MainWindow::FlushJobUpdates()
             if (oldKey != newKey)
             {
                 mProgressBars.remove(aFileId);
+                targetIndex->remove(aFileId);
                 targetTable->removeRow(row);
                 row = -1;
             }
@@ -418,6 +475,7 @@ void MainWindow::FlushJobUpdates()
             QTableWidgetItem *idItem = new QTableWidgetItem(QString::number(aFileId));
             idItem->setData(Qt::UserRole, aFileId);
             targetTable->setItem(row, 0, idItem);
+            targetIndex->insert(aFileId, idItem);
 
             QProgressBar *bar = new QProgressBar;
             bar->setMinimum(0);
@@ -504,47 +562,56 @@ void MainWindow::FlushJobUpdates()
                 bar->setProperty("_phase", static_cast<int>(aState.phase));
             }
 
+            int wantMax = 100, wantVal = 0;
+            QString wantFmt;
+
             if (aState.phase == JobPhase::Done)
             {
-                bar->setMaximum(100);
-                bar->setValue(100);
-                bar->setFormat("Done");
+                wantVal = 100;
+                wantFmt = "Done";
             }
             else if (aState.total > 0 && aState.progress >= 0)
             {
                 qint64 effectiveTotal = std::max(aState.total, aState.progress);
-                bar->setMaximum(100);
                 int pct = effectiveTotal > 0
                               ? static_cast<int>(aState.progress * 100 / effectiveTotal) : 0;
-                bar->setValue(std::min(pct, 100));
+                wantVal = std::min(pct, 100);
                 if (aState.phase == JobPhase::Uploading && pct >= 100)
                 {
-                    bar->setFormat("Finalizing...");
+                    wantFmt = "Finalizing...";
                 }
                 else
                 {
-                    bar->setFormat(QString("%1 / %2  (%p%)")
-                                       .arg(fmtBytes(aState.progress))
-                                       .arg(fmtBytes(effectiveTotal)));
+                    wantFmt = QString("%1 / %2  (%p%)")
+                                  .arg(fmtBytes(aState.progress))
+                                  .arg(fmtBytes(effectiveTotal));
                 }
             }
             else if (aState.progress > 0)
             {
-                bar->setMaximum(0);
-                bar->setFormat(fmtBytes(aState.progress));
+                wantMax = 0;
+                wantFmt = fmtBytes(aState.progress);
             }
-            else if (aState.phase == JobPhase::UploadRetryWait ||
-                     aState.phase == JobPhase::Queued ||
-                     aState.phase == JobPhase::QueuedUpload)
+            else if (aState.phase == JobPhase::UploadRetryWait)
             {
-                bar->setMaximum(100);
-                bar->setValue(0);
-                bar->setFormat(phaseStr);
+                wantFmt = phaseStr;
             }
             else
             {
-                bar->setMaximum(0);
-                bar->setFormat("");
+                wantMax = 0;
+            }
+
+            if (bar->maximum() != wantMax)
+            {
+                bar->setMaximum(wantMax);
+            }
+            if (wantMax > 0 && bar->value() != wantVal)
+            {
+                bar->setValue(wantVal);
+            }
+            if (bar->format() != wantFmt)
+            {
+                bar->setFormat(wantFmt);
             }
         }
 
@@ -1066,7 +1133,7 @@ void MainWindow::OnStart()
     cfg.keepFiles = ui->mKeepFiles->isChecked();
     cfg.downloadRetryDelaySec = ui->mDownloadRetryDelay->value();
     cfg.uploadRetryDelaySec = ui->mUploadRetryDelay->value();
-    cfg.diskReserveBytes = static_cast<qint64>(ui->mDiskReserveMb->value()) * 1024 * 1024;
+    cfg.diskReserveBytes = static_cast<qint64>(ui->mDiskReserveGb->value()) * 1024LL * 1024 * 1024;
     cfg.reportRetries = ui->mReportRetries->value();
     cfg.queuePrefetch = ui->mQueuePrefetch->value();
     cfg.uploadChunkSize = static_cast<qint64>(ui->mUploadChunkSizeMb->value()) * 1024 * 1024;
@@ -1079,6 +1146,10 @@ void MainWindow::OnStart()
     ui->mUploadTable->setRowCount(0);
     ui->mDownloadTable->setRowCount(0);
     mProgressBars.clear();
+    mUploadRowIndex.clear();
+    mDownloadRowIndex.clear();
+    mQueuedUploadCount = 0;
+    mQueuedDownloadCount = 0;
     ui->mUploadQueueLabel->setText("Upload Queue (0)");
     ui->mDownloadQueueLabel->setText("Download Queue (0)");
     mLiveDownloadProgress.clear();
@@ -1131,6 +1202,10 @@ void MainWindow::OnStop()
     ui->mUploadTable->setRowCount(0);
     ui->mDownloadTable->setRowCount(0);
     mProgressBars.clear();
+    mUploadRowIndex.clear();
+    mDownloadRowIndex.clear();
+    mQueuedUploadCount = 0;
+    mQueuedDownloadCount = 0;
     ui->mUploadQueueLabel->setText("Upload Queue (0)");
     ui->mDownloadQueueLabel->setText("Download Queue (0)");
 
@@ -1504,8 +1579,27 @@ void MainWindow::UpdateUptime()
         ui->mUploadedLabel->setText(fmtBytes(liveUl));
     }
 
-    ui->mUploadQueueLabel->setText(QString("Upload Queue (%1)").arg(ui->mUploadTable->rowCount()));
-    ui->mDownloadQueueLabel->setText(QString("Download Queue (%1)").arg(ui->mDownloadTable->rowCount()));
+    {
+        int ulActive = ui->mUploadTable->rowCount();
+        if (mQueuedUploadCount > 0)
+        {
+            ui->mUploadQueueLabel->setText(QString("Upload Queue (%1 + %2 queued)").arg(ulActive).arg(mQueuedUploadCount));
+        }
+        else
+        {
+            ui->mUploadQueueLabel->setText(QString("Upload Queue (%1)").arg(ulActive));
+        }
+
+        int dlActive = ui->mDownloadTable->rowCount();
+        if (mQueuedDownloadCount > 0)
+        {
+            ui->mDownloadQueueLabel->setText(QString("Download Queue (%1 + %2 queued)").arg(dlActive).arg(mQueuedDownloadCount));
+        }
+        else
+        {
+            ui->mDownloadQueueLabel->setText(QString("Download Queue (%1)").arg(dlActive));
+        }
+    }
 
     {
         qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -1520,23 +1614,15 @@ void MainWindow::UpdateUptime()
             int fid = it.key();
             JobState captured = it.value().second;
             mProgressBars.remove(fid);
-            for (QTableWidget *table : {ui->mUploadTable, ui->mDownloadTable})
+            if (mUploadRowIndex.contains(fid))
             {
-                bool found = false;
-                for (int r = 0; r < table->rowCount(); ++r)
-                {
-                    if (table->item(r, 0) &&
-                        table->item(r, 0)->data(Qt::UserRole).toInt() == fid)
-                    {
-                        table->removeRow(r);
-                        found = true;
-                        break;
-                    }
-                }
-                if (found)
-                {
-                    break;
-                }
+                ui->mUploadTable->removeRow(mUploadRowIndex.value(fid)->row());
+                mUploadRowIndex.remove(fid);
+            }
+            else if (mDownloadRowIndex.contains(fid))
+            {
+                ui->mDownloadTable->removeRow(mDownloadRowIndex.value(fid)->row());
+                mDownloadRowIndex.remove(fid);
             }
             AddFinishedRow(fid, captured);
             it = mPendingRemovals.erase(it);
@@ -1820,7 +1906,7 @@ void MainWindow::SetRunningUi(bool aRunning)
     ui->mAria2cConns->setEnabled(settingsEnabled || aRunning);
     ui->mDownloadRetryDelay->setEnabled(settingsEnabled || aRunning);
     ui->mUploadRetryDelay->setEnabled(settingsEnabled || aRunning);
-    ui->mDiskReserveMb->setEnabled(settingsEnabled || aRunning);
+    ui->mDiskReserveGb->setEnabled(settingsEnabled || aRunning);
     ui->mReportRetries->setEnabled(settingsEnabled || aRunning);
     ui->mQueuePrefetch->setEnabled(settingsEnabled || aRunning);
     ui->mUploadChunkSizeMb->setEnabled(settingsEnabled || aRunning);
@@ -1850,7 +1936,20 @@ void MainWindow::LoadSettings()
     ui->mKeepFiles->setChecked(s.value("keepFiles", false).toBool());
     ui->mDownloadRetryDelay->setValue(s.value("downloadRetryDelay", 5).toInt());
     ui->mUploadRetryDelay->setValue(s.value("uploadRetryDelay", 10).toInt());
-    ui->mDiskReserveMb->setValue(s.value("diskReserveMb", 500).toInt());
+    {
+        // Migrate old MB setting to new GB setting
+        int gbVal = s.value("diskReserveGb", -1).toInt();
+        if (gbVal < 0)
+        {
+            int mbVal = s.value("diskReserveMb", 50000).toInt();
+            gbVal = mbVal / 1024;
+            if (gbVal < 1 && mbVal > 0)
+            {
+                gbVal = 1;
+            }
+        }
+        ui->mDiskReserveGb->setValue(gbVal);
+    }
     ui->mReportRetries->setValue(s.value("reportRetries", 20).toInt());
     ui->mQueuePrefetch->setValue(s.value("queuePrefetch", 2).toInt());
     ui->mUploadChunkSizeMb->setValue(s.value("uploadChunkSizeMb", 8).toInt());
@@ -1859,7 +1958,7 @@ void MainWindow::LoadSettings()
     ui->mUploadFinishRetries->setValue(s.value("uploadFinishRetries", 12).toInt());
     ui->mUploadRetryCap->setValue(s.value("uploadRetryCap", 25.0).toDouble());
     ui->mUploadChunkRetryCap->setValue(s.value("uploadChunkRetryCap", 20.0).toDouble());
-    ui->mUiUpdateInterval->setValue(s.value("uiUpdateInterval", 50).toInt());
+    ui->mUiUpdateInterval->setValue(s.value("uiUpdateInterval", 250).toInt());
     mUiUpdateIntervalMs = ui->mUiUpdateInterval->value();
 }
 
@@ -1877,7 +1976,7 @@ void MainWindow::SaveSettings()
     s.setValue("keepFiles", ui->mKeepFiles->isChecked());
     s.setValue("downloadRetryDelay", ui->mDownloadRetryDelay->value());
     s.setValue("uploadRetryDelay", ui->mUploadRetryDelay->value());
-    s.setValue("diskReserveMb", ui->mDiskReserveMb->value());
+    s.setValue("diskReserveGb", ui->mDiskReserveGb->value());
     s.setValue("reportRetries", ui->mReportRetries->value());
     s.setValue("queuePrefetch", ui->mQueuePrefetch->value());
     s.setValue("uploadChunkSizeMb", ui->mUploadChunkSizeMb->value());
@@ -1905,10 +2004,30 @@ bool MainWindow::eventFilter(QObject *aObj, QEvent *aEvent)
 void MainWindow::AppendLog(const QString &aMsg)
 {
     QString stamped = QDateTime::currentDateTime().toString("[HH:mm:ss] ") + aMsg;
-    ui->mLogView->appendPlainText(stamped);
+    mPendingLogMessages.append(stamped);
+    if (mLogFlushTimer && !mLogFlushTimer->isActive())
+    {
+        mLogFlushTimer->start(100);
+    }
+}
+
+void MainWindow::FlushLogMessages()
+{
+    if (mPendingLogMessages.isEmpty())
+    {
+        return;
+    }
+
+    QStringList batch;
+    batch.swap(mPendingLogMessages);
+
+    ui->mLogView->appendPlainText(batch.join(QLatin1Char('\n')));
     ui->mLogView->moveCursor(QTextCursor::End);
     ui->mLogView->ensureCursorVisible();
-    statusBar()->showMessage(aMsg, 10000);
+
+    const QString &last = batch.last();
+    int prefixLen = 11; // "[HH:mm:ss] " length
+    statusBar()->showMessage(last.mid(prefixLen), 10000);
 }
 
 void MainWindow::closeEvent(QCloseEvent *aEvent)
