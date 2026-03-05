@@ -162,11 +162,14 @@ jobs:
           if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
             echo "Uploading app component..."
             cd "$DATA_DIR"
-            find . -type f | while read f; do
-              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
-                -F "files=@$f" \
-                "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-win/$CLEAN_VERSION/app?clean=true" || true
-            done
+            args=()
+            while IFS= read -r f; do
+              rel="${f#./}"
+              args+=(-F "files=@$f;filename=$rel")
+            done < <(find . -type f)
+            curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+              "${args[@]}" \
+              "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-win/$CLEAN_VERSION/app?clean=true" || true
             cd -
           fi
 
@@ -309,11 +312,14 @@ jobs:
           if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
             echo "Uploading app component..."
             cd "$DATA_DIR"
-            find . -type f | while read f; do
-              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
-                -F "files=@$f" \
-                "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-mac/$CLEAN_VERSION/app?clean=true" || true
-            done
+            args=()
+            while IFS= read -r f; do
+              rel="${f#./}"
+              args+=(-F "files=@$f;filename=$rel")
+            done < <(find . -type f)
+            curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+              "${args[@]}" \
+              "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-mac/$CLEAN_VERSION/app?clean=true" || true
             cd -
           fi
 
@@ -442,11 +448,14 @@ jobs:
           if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
             echo "Uploading app component..."
             cd "$DATA_DIR"
-            find . -type f | while read f; do
-              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
-                -F "files=@$f" \
-                "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-linux/$CLEAN_VERSION/app?clean=true" || true
-            done
+            args=()
+            while IFS= read -r f; do
+              rel="${f#./}"
+              args+=(-F "files=@$f;filename=$rel")
+            done < <(find . -type f)
+            curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+              "${args[@]}" \
+              "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-linux/$CLEAN_VERSION/app?clean=true" || true
             cd -
           fi
 
