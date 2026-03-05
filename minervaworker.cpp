@@ -206,6 +206,8 @@ void MinervaWorker::RecoverFromManifest()
 
     emit Log(QString("Manifest recovery: %1 entries found").arg(entries.size()));
 
+    int cleaned = 0, uploads = 0, downloads = 0, missing = 0, stale = 0;
+
     for (QMap<int, FileEntry>::const_iterator it = entries.constBegin(); it != entries.constEnd(); ++it)
     {
         const FileEntry &e = it.value();
@@ -216,7 +218,7 @@ void MinervaWorker::RecoverFromManifest()
         case FileState::Duplicate:
             QFile::remove(e.localPath);
             mManifest.RemoveEntry(e.fileId);
-            emit Log(QString("  Manifest: cleaned up finished entry %1").arg(e.fileId));
+            ++cleaned;
             break;
 
         case FileState::Downloaded:
@@ -225,7 +227,6 @@ void MinervaWorker::RecoverFromManifest()
         {
             if (QFile::exists(e.localPath))
             {
-                emit Log(QString("  Manifest: recovering upload for %1 (%2)").arg(e.fileId).arg(LabelForPath(e.destPath)));
                 JobInfo job;
                 job.fileId = e.fileId;
                 job.url = e.url;
@@ -233,11 +234,12 @@ void MinervaWorker::RecoverFromManifest()
                 job.size = e.size;
                 mSeenIds.insert(e.fileId);
                 EnqueueUpload(job, e.localPath, QFileInfo(e.localPath).size(), e.uploadRetryCount);
+                ++uploads;
             }
             else
             {
-                emit Log(QString("  Manifest: file missing for %1, removing").arg(e.fileId));
                 mManifest.RemoveEntry(e.fileId);
+                ++missing;
             }
             break;
         }
@@ -249,18 +251,22 @@ void MinervaWorker::RecoverFromManifest()
 
             if (!hasPartial && !hasFile)
             {
-                emit Log(QString("  Manifest: no file for %1, removing stale entry").arg(e.fileId));
                 mManifest.RemoveEntry(e.fileId);
+                ++stale;
             }
             else
             {
                 mSeenIds.insert(e.fileId);
                 ProbeFileNeeded(e);
+                ++downloads;
             }
             break;
         }
         }
     }
+
+    emit Log(QString("  Recovery: %1 uploads, %2 downloads, %3 cleaned, %4 missing, %5 stale")
+             .arg(uploads).arg(downloads).arg(cleaned).arg(missing).arg(stale));
 }
 
 void MinervaWorker::ProbeFileNeeded(const FileEntry &aEntry)
@@ -574,6 +580,7 @@ void MinervaWorker::Stop()
     {
         dl->Abort();
     }
+    mInFlightDownloadBytes = 0;
 
     for (UploadManager *ul : findChildren<UploadManager*>())
     {
@@ -615,7 +622,7 @@ void MinervaWorker::FetchJobs()
     qint64 availableBytes = si.isValid() ? si.bytesAvailable() : -1;
     if (availableBytes >= 0)
     {
-        qint64 committedBytes = 0;
+        qint64 committedBytes = mInFlightDownloadBytes;
         for (const JobInfo &qj : mQueue)
         {
             committedBytes += qj.size;
@@ -686,7 +693,7 @@ void MinervaWorker::FetchJobs()
 
         QStorageInfo si(mCfg.tempDir);
         qint64 availableBytes = si.isValid() ? si.bytesAvailable() : -1;
-        qint64 committedBytes = 0;
+        qint64 committedBytes = mInFlightDownloadBytes;
         for (const JobInfo &qj : mQueue)
         {
             committedBytes += qj.size;
@@ -750,6 +757,7 @@ void MinervaWorker::TryDispatchDownloads()
     {
         JobInfo job = mQueue.dequeue();
         mDownloadSlots++;
+        mInFlightDownloadBytes += job.size;
         ProcessJob(job);
     }
 }
@@ -804,6 +812,7 @@ void MinervaWorker::ProcessJob(const JobInfo &aJob)
         if (!mRunning)
         {
             mDownloadSlots--;
+            mInFlightDownloadBytes -= aJob.size;
             mSeenIds.remove(aJob.fileId);
             TryDispatchDownloads();
             return;
@@ -820,6 +829,7 @@ void MinervaWorker::ProcessJob(const JobInfo &aJob)
 
             emit JobRemoved(aJob.fileId);
             mDownloadSlots--;
+            mInFlightDownloadBytes -= aJob.size;
             mSeenIds.remove(aJob.fileId);
             TryDispatchDownloads();
             return;
@@ -834,6 +844,7 @@ void MinervaWorker::DoDownload(const JobInfo &aJob, const QString &aLocalPath, i
     if (!mRunning)
     {
         mDownloadSlots--;
+        mInFlightDownloadBytes -= aJob.size;
         mSeenIds.remove(aJob.fileId);
         TryDispatchDownloads();
         return;
@@ -876,6 +887,7 @@ void MinervaWorker::DoDownload(const JobInfo &aJob, const QString &aLocalPath, i
         if (!mRunning)
         {
             mDownloadSlots--;
+            mInFlightDownloadBytes -= aJob.size;
             mSeenIds.remove(aJob.fileId);
             TryDispatchDownloads();
             return;
@@ -904,6 +916,7 @@ void MinervaWorker::DoDownload(const JobInfo &aJob, const QString &aLocalPath, i
 
         mManifest.SetEntry(aJob.fileId, FileState::Downloaded);
         mDownloadSlots--;
+        mInFlightDownloadBytes -= aJob.size;
 
         QFileInfo fi(aLocalPath);
         qint64 fileSize = fi.size();

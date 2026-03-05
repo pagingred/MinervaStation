@@ -17,7 +17,7 @@ struct MinervaConfig
     bool keepFiles = false;
     int downloadRetryDelaySec = 5;
     int uploadRetryDelaySec = 10;
-    qint64 diskReserveBytes = 500LL * 1024 * 1024;
+    qint64 diskReserveBytes = 50LL * 1024 * 1024 * 1024;
     int reportRetries = 20;
     int queuePrefetch = 2;
     qint64 uploadChunkSize = 8LL * 1024 * 1024;

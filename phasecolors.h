@@ -27,14 +27,9 @@ public:
         }
     }
 
-    static int SortKey(JobPhase aPhase, qint64 aProgress = 0, qint64 aTotal = 0)
+    static int SortKey(JobPhase aPhase, qint64 = 0, qint64 = 0)
     {
-        int permyriad = 0;
-        if (aTotal > 0)
-        {
-            permyriad = static_cast<int>(aProgress * 10000 / aTotal);
-        }
-        return Priority(aPhase) * 100000 + (10000 - permyriad);
+        return Priority(aPhase);
     }
 
     static QColor Color(JobPhase aPhase)

@@ -118,6 +118,7 @@ private:
     QSet<int> mSeenIds;
     bool mNoJobsWarned = false;
     int mDownloadSlots = 0;
+    qint64 mInFlightDownloadBytes = 0;
     QQueue<UploadQueueEntry> mUploadQueue;
     int mUploadSlots = 0;
     int mOkCount = 0;
