@@ -250,97 +250,143 @@
       <widget class="QWidget" name="settingsTab">
        <attribute name="title"><string>Settings</string></attribute>
        <layout class="QVBoxLayout" name="settingsOuterLayout">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
         <item>
-         <layout class="QFormLayout" name="settingsForm">
-          <item row="0" column="0"><widget class="QLabel" name="labelServerUrl"><property name="text"><string>API Server:</string></property></widget></item>
-          <item row="0" column="1"><widget class="QLineEdit" name="mServerUrl"><property name="text"><string>https://api.minerva-archive.org</string></property></widget></item>
-          <item row="1" column="0"><widget class="QLabel" name="labelUploadUrl"><property name="text"><string>Upload Server:</string></property></widget></item>
-          <item row="1" column="1"><widget class="QLineEdit" name="mUploadUrl"><property name="text"><string>https://gate.minerva-archive.org</string></property></widget></item>
-          <item row="2" column="0"><widget class="QLabel" name="labelDlConc"><property name="text"><string>DL Concurrency:</string></property></widget></item>
-          <item row="2" column="1"><widget class="QSpinBox" name="mDlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
-          <item row="3" column="0"><widget class="QLabel" name="labelUlConc"><property name="text"><string>UL Concurrency:</string></property></widget></item>
-          <item row="3" column="1"><widget class="QSpinBox" name="mUlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
-          <item row="4" column="0"><widget class="QLabel" name="labelBatch"><property name="text"><string>Batch Size:</string></property></widget></item>
-          <item row="4" column="1"><widget class="QSpinBox" name="mBatchSize"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>10</number></property></widget></item>
-          <item row="5" column="0"><widget class="QLabel" name="labelAria2c"><property name="text"><string>aria2c Connections:</string></property></widget></item>
-          <item row="5" column="1"><widget class="QSpinBox" name="mAria2cConns"><property name="minimum"><number>1</number></property><property name="maximum"><number>16</number></property><property name="value"><number>8</number></property></widget></item>
-          <item row="6" column="0"><widget class="QLabel" name="labelRecPlaceholder"><property name="text"><string/></property></widget></item>
-          <item row="6" column="1"><widget class="QPushButton" name="mRecommendBtn"><property name="text"><string>Recommended Settings</string></property><property name="toolTip"><string>Auto-detect system capabilities and run a network speed test to calculate optimal values</string></property></widget></item>
-          <item row="7" column="0"><widget class="QLabel" name="labelTempDir"><property name="text"><string>Temp Dir:</string></property></widget></item>
-          <item row="7" column="1">
-           <layout class="QHBoxLayout" name="tempDirRow">
-            <item><widget class="QLineEdit" name="mTempDir"/></item>
-            <item><widget class="QPushButton" name="browseTempBtn"><property name="text"><string>Browse...</string></property></widget></item>
+         <widget class="QScrollArea" name="settingsScroll">
+          <property name="widgetResizable"><bool>true</bool></property>
+          <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+          <widget class="QWidget" name="settingsScrollContent">
+           <layout class="QVBoxLayout" name="settingsScrollLayout">
+            <property name="spacing"><number>6</number></property>
+            <item>
+             <widget class="QGroupBox" name="serversBox">
+              <property name="title"><string>Servers</string></property>
+              <layout class="QFormLayout" name="serversForm">
+               <item row="0" column="0"><widget class="QLabel" name="labelServerUrl"><property name="text"><string>API Server:</string></property></widget></item>
+               <item row="0" column="1"><widget class="QLineEdit" name="mServerUrl"><property name="text"><string>https://api.minerva-archive.org</string></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelUploadUrl"><property name="text"><string>Upload Server:</string></property></widget></item>
+               <item row="1" column="1"><widget class="QLineEdit" name="mUploadUrl"><property name="text"><string>https://gate.minerva-archive.org</string></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="dirsBox">
+              <property name="title"><string>Directories &amp; Storage</string></property>
+              <layout class="QFormLayout" name="dirsForm">
+               <item row="0" column="0"><widget class="QLabel" name="labelTempDir"><property name="text"><string>Temp Dir:</string></property></widget></item>
+               <item row="0" column="1">
+                <layout class="QHBoxLayout" name="tempDirRow">
+                 <item><widget class="QLineEdit" name="mTempDir"/></item>
+                 <item><widget class="QPushButton" name="browseTempBtn"><property name="text"><string>Browse...</string></property></widget></item>
+                </layout>
+               </item>
+               <item row="1" column="0"><widget class="QLabel" name="labelDlDir"><property name="text"><string>Downloads Dir:</string></property></widget></item>
+               <item row="1" column="1">
+                <layout class="QHBoxLayout" name="dlDirRow">
+                 <item><widget class="QLineEdit" name="mDownloadsDir"/></item>
+                 <item><widget class="QPushButton" name="browseDlBtn"><property name="text"><string>Browse...</string></property></widget></item>
+                </layout>
+               </item>
+               <item row="2" column="0"><widget class="QLabel" name="labelDiskReserve"><property name="text"><string>Min Free Disk (GB):</string></property></widget></item>
+               <item row="2" column="1"><widget class="QSpinBox" name="mDiskReserveGb"><property name="minimum"><number>0</number></property><property name="maximum"><number>500</number></property><property name="value"><number>50</number></property><property name="toolTip"><string>Stop downloading when free disk space would drop below this amount</string></property></widget></item>
+               <item row="3" column="0"><widget class="QLabel" name="labelKeepPlaceholder"><property name="text"><string/></property></widget></item>
+               <item row="3" column="1"><widget class="QCheckBox" name="mKeepFiles"><property name="text"><string>Keep downloaded files after upload</string></property></widget></item>
+               <item row="4" column="0"><widget class="QLabel" name="labelAria2cPlaceholder"><property name="text"><string/></property></widget></item>
+               <item row="4" column="1"><widget class="QLabel" name="mAria2cLabel"><property name="text"><string/></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="perfBox">
+              <property name="title"><string>Performance</string></property>
+              <layout class="QFormLayout" name="perfForm">
+               <item row="0" column="0"><widget class="QLabel" name="labelDlConc"><property name="text"><string>Download Concurrency:</string></property></widget></item>
+               <item row="0" column="1"><widget class="QSpinBox" name="mDlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelUlConc"><property name="text"><string>Upload Concurrency:</string></property></widget></item>
+               <item row="1" column="1"><widget class="QSpinBox" name="mUlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
+               <item row="2" column="0"><widget class="QLabel" name="labelBatch"><property name="text"><string>Batch Size:</string></property></widget></item>
+               <item row="2" column="1"><widget class="QSpinBox" name="mBatchSize"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>10</number></property></widget></item>
+               <item row="3" column="0"><widget class="QLabel" name="labelAria2c"><property name="text"><string>aria2c Connections:</string></property></widget></item>
+               <item row="3" column="1"><widget class="QSpinBox" name="mAria2cConns"><property name="minimum"><number>1</number></property><property name="maximum"><number>16</number></property><property name="value"><number>8</number></property></widget></item>
+               <item row="4" column="0"><widget class="QLabel" name="labelQueuePrefetch"><property name="text"><string>Queue Prefetch:</string></property></widget></item>
+               <item row="4" column="1"><widget class="QSpinBox" name="mQueuePrefetch"><property name="minimum"><number>1</number></property><property name="maximum"><number>20</number></property><property name="value"><number>2</number></property></widget></item>
+               <item row="5" column="0"><widget class="QLabel" name="labelRecPlaceholder"><property name="text"><string/></property></widget></item>
+               <item row="5" column="1"><widget class="QPushButton" name="mRecommendBtn"><property name="text"><string>Recommended Settings</string></property><property name="toolTip"><string>Auto-detect system capabilities and run a network speed test to calculate optimal values</string></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="downloadBox">
+              <property name="title"><string>Download</string></property>
+              <layout class="QFormLayout" name="downloadForm">
+               <item row="0" column="0"><widget class="QLabel" name="labelDlRetryDelay"><property name="text"><string>Retry Delay (sec):</string></property></widget></item>
+               <item row="0" column="1"><widget class="QSpinBox" name="mDownloadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>5</number></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="uploadBox">
+              <property name="title"><string>Upload</string></property>
+              <layout class="QFormLayout" name="uploadForm">
+               <item row="0" column="0"><widget class="QLabel" name="labelUlRetryDelay"><property name="text"><string>Retry Delay (sec):</string></property></widget></item>
+               <item row="0" column="1"><widget class="QSpinBox" name="mUploadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>10</number></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelChunkSize"><property name="text"><string>Chunk Size (MB):</string></property></widget></item>
+               <item row="1" column="1"><widget class="QSpinBox" name="mUploadChunkSizeMb"><property name="minimum"><number>1</number></property><property name="maximum"><number>64</number></property><property name="value"><number>8</number></property></widget></item>
+               <item row="2" column="0"><widget class="QLabel" name="labelReportRetries"><property name="text"><string>Report Retries:</string></property></widget></item>
+               <item row="2" column="1"><widget class="QSpinBox" name="mReportRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>20</number></property></widget></item>
+               <item row="3" column="0"><widget class="QLabel" name="labelStartRetries"><property name="text"><string>Start Retries:</string></property></widget></item>
+               <item row="3" column="1"><widget class="QSpinBox" name="mUploadStartRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
+               <item row="4" column="0"><widget class="QLabel" name="labelChunkRetries"><property name="text"><string>Chunk Retries:</string></property></widget></item>
+               <item row="4" column="1"><widget class="QSpinBox" name="mUploadChunkRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>30</number></property></widget></item>
+               <item row="5" column="0"><widget class="QLabel" name="labelFinishRetries"><property name="text"><string>Finish Retries:</string></property></widget></item>
+               <item row="5" column="1"><widget class="QSpinBox" name="mUploadFinishRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
+               <item row="6" column="0"><widget class="QLabel" name="labelUlRetryCap"><property name="text"><string>Retry Cap (sec):</string></property></widget></item>
+               <item row="6" column="1"><widget class="QDoubleSpinBox" name="mUploadRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>25.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
+               <item row="7" column="0"><widget class="QLabel" name="labelChunkRetryCap"><property name="text"><string>Chunk Retry Cap (sec):</string></property></widget></item>
+               <item row="7" column="1"><widget class="QDoubleSpinBox" name="mUploadChunkRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>20.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="uiBox">
+              <property name="title"><string>Interface</string></property>
+              <layout class="QFormLayout" name="uiForm">
+               <item row="0" column="0"><widget class="QLabel" name="labelUiInterval"><property name="text"><string>UI Update Interval (ms):</string></property></widget></item>
+               <item row="0" column="1"><widget class="QSpinBox" name="mUiUpdateInterval"><property name="minimum"><number>50</number></property><property name="maximum"><number>2000</number></property><property name="value"><number>250</number></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="statusBox">
+              <property name="title"><string>Server Connection Status</string></property>
+              <layout class="QFormLayout" name="statusGrid">
+               <item row="0" column="0"><widget class="QLabel" name="labelSrvVersion"><property name="text"><string>API /worker/version:</string></property></widget></item>
+               <item row="0" column="1"><widget class="QLabel" name="mStatusApiVersion"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelSrvJobs"><property name="text"><string>API /api/jobs:</string></property></widget></item>
+               <item row="1" column="1"><widget class="QLabel" name="mStatusApiJobs"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="2" column="0"><widget class="QLabel" name="labelSrvReport"><property name="text"><string>API /api/jobs/report:</string></property></widget></item>
+               <item row="2" column="1"><widget class="QLabel" name="mStatusApiReport"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="3" column="0"><widget class="QLabel" name="labelSrvLb"><property name="text"><string>API /api/leaderboard:</string></property></widget></item>
+               <item row="3" column="1"><widget class="QLabel" name="mStatusApiLeaderboard"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="4" column="0"><widget class="QLabel" name="labelSrvGate"><property name="text"><string>Gate /api/upload:</string></property></widget></item>
+               <item row="4" column="1"><widget class="QLabel" name="mStatusGateUpload"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="5" column="0"><widget class="QLabel" name="labelSrvBtnPlaceholder"><property name="text"><string/></property></widget></item>
+               <item row="5" column="1"><widget class="QPushButton" name="mCheckServersBtn"><property name="text"><string>Check Servers</string></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <spacer name="settingsBottomSpacer">
+              <property name="orientation"><enum>Qt::Vertical</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property>
+             </spacer>
+            </item>
            </layout>
-          </item>
-          <item row="8" column="0"><widget class="QLabel" name="labelDlDir"><property name="text"><string>Downloads Dir:</string></property></widget></item>
-          <item row="8" column="1">
-           <layout class="QHBoxLayout" name="dlDirRow">
-            <item><widget class="QLineEdit" name="mDownloadsDir"/></item>
-            <item><widget class="QPushButton" name="browseDlBtn"><property name="text"><string>Browse...</string></property></widget></item>
-           </layout>
-          </item>
-          <item row="9" column="0"><widget class="QLabel" name="labelKeepPlaceholder"><property name="text"><string/></property></widget></item>
-          <item row="9" column="1"><widget class="QCheckBox" name="mKeepFiles"><property name="text"><string>Keep downloaded files after upload</string></property></widget></item>
-          <item row="10" column="0"><widget class="QLabel" name="labelAria2cPlaceholder"><property name="text"><string/></property></widget></item>
-          <item row="10" column="1"><widget class="QLabel" name="mAria2cLabel"><property name="text"><string/></property></widget></item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="advancedBox">
-          <property name="title"><string>Advanced Settings</string></property>
-          <layout class="QFormLayout" name="advancedForm">
-           <item row="0" column="0"><widget class="QLabel" name="labelDlRetryDelay"><property name="text"><string>DL Retry Delay (sec):</string></property></widget></item>
-           <item row="0" column="1"><widget class="QSpinBox" name="mDownloadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>5</number></property></widget></item>
-           <item row="1" column="0"><widget class="QLabel" name="labelUlRetryDelay"><property name="text"><string>UL Retry Delay (sec):</string></property></widget></item>
-           <item row="1" column="1"><widget class="QSpinBox" name="mUploadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>10</number></property></widget></item>
-           <item row="2" column="0"><widget class="QLabel" name="labelDiskReserve"><property name="text"><string>Disk Reserve (MB):</string></property></widget></item>
-           <item row="2" column="1"><widget class="QSpinBox" name="mDiskReserveMb"><property name="minimum"><number>0</number></property><property name="maximum"><number>100000</number></property><property name="value"><number>500</number></property></widget></item>
-           <item row="3" column="0"><widget class="QLabel" name="labelReportRetries"><property name="text"><string>Report Retries:</string></property></widget></item>
-           <item row="3" column="1"><widget class="QSpinBox" name="mReportRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>20</number></property></widget></item>
-           <item row="4" column="0"><widget class="QLabel" name="labelQueuePrefetch"><property name="text"><string>Queue Prefetch:</string></property></widget></item>
-           <item row="4" column="1"><widget class="QSpinBox" name="mQueuePrefetch"><property name="minimum"><number>1</number></property><property name="maximum"><number>20</number></property><property name="value"><number>2</number></property></widget></item>
-           <item row="5" column="0"><widget class="QLabel" name="labelChunkSize"><property name="text"><string>Upload Chunk Size (MB):</string></property></widget></item>
-           <item row="5" column="1"><widget class="QSpinBox" name="mUploadChunkSizeMb"><property name="minimum"><number>1</number></property><property name="maximum"><number>64</number></property><property name="value"><number>8</number></property></widget></item>
-           <item row="6" column="0"><widget class="QLabel" name="labelStartRetries"><property name="text"><string>UL Start Retries:</string></property></widget></item>
-           <item row="6" column="1"><widget class="QSpinBox" name="mUploadStartRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
-           <item row="7" column="0"><widget class="QLabel" name="labelChunkRetries"><property name="text"><string>UL Chunk Retries:</string></property></widget></item>
-           <item row="7" column="1"><widget class="QSpinBox" name="mUploadChunkRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>30</number></property></widget></item>
-           <item row="8" column="0"><widget class="QLabel" name="labelFinishRetries"><property name="text"><string>UL Finish Retries:</string></property></widget></item>
-           <item row="8" column="1"><widget class="QSpinBox" name="mUploadFinishRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
-           <item row="9" column="0"><widget class="QLabel" name="labelUlRetryCap"><property name="text"><string>UL Retry Cap (sec):</string></property></widget></item>
-           <item row="9" column="1"><widget class="QDoubleSpinBox" name="mUploadRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>25.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
-           <item row="10" column="0"><widget class="QLabel" name="labelChunkRetryCap"><property name="text"><string>UL Chunk Retry Cap (sec):</string></property></widget></item>
-           <item row="10" column="1"><widget class="QDoubleSpinBox" name="mUploadChunkRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>20.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
-           <item row="11" column="0"><widget class="QLabel" name="labelUiInterval"><property name="text"><string>UI Update Interval (ms):</string></property></widget></item>
-           <item row="11" column="1"><widget class="QSpinBox" name="mUiUpdateInterval"><property name="minimum"><number>10</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>50</number></property></widget></item>
-          </layout>
+          </widget>
          </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="statusBox">
-          <property name="title"><string>Server Connection Status</string></property>
-          <layout class="QFormLayout" name="statusGrid">
-           <item row="0" column="0"><widget class="QLabel" name="labelSrvVersion"><property name="text"><string>API /worker/version:</string></property></widget></item>
-           <item row="0" column="1"><widget class="QLabel" name="mStatusApiVersion"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-           <item row="1" column="0"><widget class="QLabel" name="labelSrvJobs"><property name="text"><string>API /api/jobs:</string></property></widget></item>
-           <item row="1" column="1"><widget class="QLabel" name="mStatusApiJobs"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-           <item row="2" column="0"><widget class="QLabel" name="labelSrvReport"><property name="text"><string>API /api/jobs/report:</string></property></widget></item>
-           <item row="2" column="1"><widget class="QLabel" name="mStatusApiReport"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-           <item row="3" column="0"><widget class="QLabel" name="labelSrvLb"><property name="text"><string>API /api/leaderboard:</string></property></widget></item>
-           <item row="3" column="1"><widget class="QLabel" name="mStatusApiLeaderboard"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-           <item row="4" column="0"><widget class="QLabel" name="labelSrvGate"><property name="text"><string>Gate /api/upload:</string></property></widget></item>
-           <item row="4" column="1"><widget class="QLabel" name="mStatusGateUpload"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-           <item row="5" column="0"><widget class="QLabel" name="labelSrvBtnPlaceholder"><property name="text"><string/></property></widget></item>
-           <item row="5" column="1"><widget class="QPushButton" name="mCheckServersBtn"><property name="text"><string>Check Servers</string></property></widget></item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <spacer name="settingsBottomSpacer">
-          <property name="orientation"><enum>Qt::Vertical</enum></property>
-          <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
-         </spacer>
         </item>
        </layout>
       </widget>
