@@ -1675,7 +1675,7 @@ void MainWindow::FetchUserProfile(const QString &aToken)
     AppendLog(QString("[JWT] Payload: %1").arg(QString::fromUtf8(decoded).left(500)));
 
     QString username;
-    for (const QString &key : {"discord_username", "username", "name", "sub", "preferred_username"})
+    for (const auto &key : {"discord_username", "username", "name", "sub", "preferred_username"})
     {
         username = obj.value(key).toString();
         if (!username.isEmpty())
@@ -1690,7 +1690,7 @@ void MainWindow::FetchUserProfile(const QString &aToken)
     }
 
     QString avatarUrl;
-    for (const QString &key : {"avatar_url", "discord_avatar_url", "picture"})
+    for (const auto &key : {"avatar_url", "discord_avatar_url", "picture"})
     {
         avatarUrl = obj.value(key).toString();
         if (!avatarUrl.isEmpty())
@@ -1702,7 +1702,7 @@ void MainWindow::FetchUserProfile(const QString &aToken)
     if (avatarUrl.isEmpty())
     {
         QString discordId;
-        for (const QString &key : {"discord_id", "id", "user_id", "sub"})
+        for (const auto &key : {"discord_id", "id", "user_id", "sub"})
         {
             discordId = obj.value(key).toString();
             if (discordId.isEmpty())
@@ -1718,7 +1718,7 @@ void MainWindow::FetchUserProfile(const QString &aToken)
             }
         }
         QString avatarHash;
-        for (const QString &key : {"avatar", "avatar_hash", "discord_avatar"})
+        for (const auto &key : {"avatar", "avatar_hash", "discord_avatar"})
         {
             avatarHash = obj.value(key).toString();
             if (!avatarHash.isEmpty())

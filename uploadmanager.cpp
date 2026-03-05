@@ -21,8 +21,8 @@ double UploadManager::RetrySleep(int aAttempt, double aCap)
 UploadManager::UploadManager(QNetworkAccessManager *aNam, QObject *aParent)
     : QObject(aParent)
     , mNam(aNam)
-    , mFile(nullptr)
     , mFileId(0)
+    , mFile(nullptr)
     , mFileSize(0)
     , mSent(0)
     , mChunkSending(0)
@@ -196,7 +196,7 @@ void UploadManager::DoPost(const QUrl &aUrl, const QByteArray &aBody, const QByt
                 }
             });
 
-    connect(reply, &QNetworkReply::finished, this, [=]()
+    connect(reply, &QNetworkReply::finished, this, [=, this]()
             {
                 mChunkSending = 0;
                 reply->deleteLater();
@@ -235,7 +235,7 @@ void UploadManager::DoPost(const QUrl &aUrl, const QByteArray &aBody, const QByt
                                  .arg(mFileId).arg(aAttempt).arg(aMaxRetries).arg(httpCode));
                     }
                     int delayMs = static_cast<int>(RetrySleep(aAttempt, aRetryCap) * 1000);
-                    QTimer::singleShot(delayMs, this, [=]()
+                    QTimer::singleShot(delayMs, this, [=, this]()
                             {
                                 DoPost(aUrl, aBody, aContentType, aMaxRetries, aRetryCap, aOnSuccess, aOnFail, aAttempt + 1);
                             });

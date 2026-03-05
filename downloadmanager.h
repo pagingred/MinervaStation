@@ -2,6 +2,7 @@
 #define DOWNLOADMANAGER_H
 
 #include <QObject>
+#include <QTimer>
 
 class QNetworkAccessManager;
 class QProcess;

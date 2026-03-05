@@ -1264,7 +1264,7 @@ void MinervaWorker::ReportWithRetry(int aFileId, const QString &aStatus, qint64 
     }
 
     QNetworkReply *reply = mNam->post(req, payload);
-    connect(reply, &QNetworkReply::finished, this, [=]()
+    connect(reply, &QNetworkReply::finished, this, [=, this]()
     {
         reply->deleteLater();
         int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -1281,7 +1281,7 @@ void MinervaWorker::ReportWithRetry(int aFileId, const QString &aStatus, qint64 
                     emit Log(QString("[RPT %1] 409 finalize race — retry %2/%3").arg(aFileId).arg(aAttempt).arg(aMaxAttempts));
                 }
                 int delayMs = static_cast<int>(std::min(2000.0, (0.25 + aAttempt * 0.1) * 1000));
-                QTimer::singleShot(delayMs, this, [=]()
+                QTimer::singleShot(delayMs, this, [=, this]()
                 {
                     ReportWithRetry(aFileId, aStatus, aBytes, aError, aAttempt + 1, aMaxAttempts, aDone);
                 });
@@ -1304,7 +1304,7 @@ void MinervaWorker::ReportWithRetry(int aFileId, const QString &aStatus, qint64 
                     emit Log(QString("[RPT %1] HTTP %2 — retry %3/%4").arg(aFileId).arg(httpCode).arg(aAttempt).arg(aMaxAttempts));
                 }
                 int delayMs = static_cast<int>(retrySleep(aAttempt) * 1000);
-                QTimer::singleShot(delayMs, this, [=]()
+                QTimer::singleShot(delayMs, this, [=, this]()
                 {
                     ReportWithRetry(aFileId, aStatus, aBytes, aError, aAttempt + 1, aMaxAttempts, aDone);
                 });
@@ -1472,7 +1472,7 @@ void MinervaWorker::FetchLeaderboard(const QString &aServerUrl, const QString &a
         else if (doc.isObject())
         {
             QJsonObject obj = doc.object();
-            for (const QString &key : {"leaderboard", "results", "data", "users"})
+            for (const auto &key : {"leaderboard", "results", "data", "users"})
             {
                 if (obj.contains(key) && obj.value(key).isArray())
                 {
