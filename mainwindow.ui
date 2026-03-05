@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="windowTitle"><string>MinervaStation</string></property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="mainLayout" stretch="0,1">
+    <item>
+     <layout class="QHBoxLayout" name="topBar">
+      <item>
+       <widget class="QLabel" name="mUserAvatar">
+        <property name="minimumSize"><size><width>28</width><height>28</height></size></property>
+        <property name="maximumSize"><size><width>28</width><height>28</height></size></property>
+        <property name="scaledContents"><bool>true</bool></property>
+        <property name="text"><string/></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="mLoginLabel">
+        <property name="text"><string>Not logged in</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="topSpacer1">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>8</width><height>0</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mLoginBtn">
+        <property name="text"><string>Discord Login</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mLogoutBtn">
+        <property name="text"><string>Logout</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="topStretch">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="mVersionLabel">
+        <property name="text"><string/></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="topSpacer2">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>20</width><height>0</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mStartBtn">
+        <property name="minimumSize"><size><width>100</width><height>0</height></size></property>
+        <property name="text"><string>Start</string></property>
+        <property name="styleSheet"><string>QPushButton { font-weight: bold; padding: 6px 16px; }</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mPauseBtn">
+        <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+        <property name="text"><string>Pause</string></property>
+        <property name="styleSheet"><string>QPushButton { font-weight: bold; padding: 6px 16px; background: #f39c12; color: white; }</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mStopBtn">
+        <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+        <property name="text"><string>Stop</string></property>
+        <property name="styleSheet"><string>QPushButton { font-weight: bold; padding: 6px 16px; background: #c0392b; color: white; }</string></property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QTabWidget" name="mTabs">
+      <property name="currentIndex"><number>0</number></property>
+      <widget class="QWidget" name="dashTab">
+       <attribute name="title"><string>Dashboard</string></attribute>
+       <layout class="QVBoxLayout" name="dashLayout" stretch="0,1">
+        <item>
+         <widget class="QGroupBox" name="statsBox">
+          <property name="title"><string>Stats</string></property>
+          <layout class="QHBoxLayout" name="statsLayout">
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelRankTitle"><property name="text"><string>Rank</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mRankLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelVerifiedTitle"><property name="text"><string>Verified</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mVerifiedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelCompletedTitle"><property name="text"><string>Completed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mOkLabel"><property name="text"><string>0</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelFailedTitle"><property name="text"><string>Failed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mFailLabel"><property name="text"><string>0</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelDownloadedTitle"><property name="text"><string>Downloaded</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mDownloadedLabel"><property name="text"><string>0 B</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelDlSpeedTitle"><property name="text"><string>Avg DL Speed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mDlSpeedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelUploadedTitle"><property name="text"><string>Uploaded</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mUploadedLabel"><property name="text"><string>0 B</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelUlSpeedTitle"><property name="text"><string>Avg UL Speed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mUlSpeedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelUptimeTitle"><property name="text"><string>Uptime</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mUptimeLabel"><property name="text"><string>--:--:--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelTempDiskTitle"><property name="text"><string>Temp Disk</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mTempDiskLabel"><property name="text"><string>...</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelDlDiskTitle"><property name="text"><string>DL Disk</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mDlDiskLabel"><property name="text"><string>...</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSplitter" name="dashSplitter">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <widget class="QWidget" name="mUploadWidget">
+           <layout class="QVBoxLayout" name="ulLay">
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item>
+             <widget class="QLabel" name="mUploadQueueLabel">
+              <property name="text"><string>Upload Queue</string></property>
+              <property name="styleSheet"><string>font-weight: bold; font-size: 11px; color: #e67e22;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="mUploadTable">
+              <property name="columnCount"><number>6</number></property>
+              <property name="rowCount"><number>0</number></property>
+              <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+              <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+              <column><property name="text"><string>ID</string></property></column>
+              <column><property name="text"><string>Phase</string></property></column>
+              <column><property name="text"><string>File</string></property></column>
+              <column><property name="text"><string>Progress</string></property></column>
+              <column><property name="text"><string>Status</string></property></column>
+              <column><property name="text"><string/></property></column>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="mDownloadWidget">
+           <layout class="QVBoxLayout" name="dlLay">
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item>
+             <widget class="QLabel" name="mDownloadQueueLabel">
+              <property name="text"><string>Download Queue</string></property>
+              <property name="styleSheet"><string>font-weight: bold; font-size: 11px; color: #2980b9;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="mDownloadTable">
+              <property name="columnCount"><number>6</number></property>
+              <property name="rowCount"><number>0</number></property>
+              <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+              <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+              <column><property name="text"><string>ID</string></property></column>
+              <column><property name="text"><string>Phase</string></property></column>
+              <column><property name="text"><string>File</string></property></column>
+              <column><property name="text"><string>Progress</string></property></column>
+              <column><property name="text"><string>Status</string></property></column>
+              <column><property name="text"><string/></property></column>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="finWidget">
+           <layout class="QVBoxLayout" name="finLay">
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item>
+             <widget class="QLabel" name="mFinishedLabel">
+              <property name="text"><string>Completed / Failed History</string></property>
+              <property name="styleSheet"><string>font-weight: bold; font-size: 11px; color: #888;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="mFinishedTable">
+              <property name="columnCount"><number>5</number></property>
+              <property name="rowCount"><number>0</number></property>
+              <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+              <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+              <column><property name="text"><string>ID</string></property></column>
+              <column><property name="text"><string>File</string></property></column>
+              <column><property name="text"><string>Size</string></property></column>
+              <column><property name="text"><string>Result</string></property></column>
+              <column><property name="text"><string>Date</string></property></column>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="settingsTab">
+       <attribute name="title"><string>Settings</string></attribute>
+       <layout class="QVBoxLayout" name="settingsOuterLayout">
+        <item>
+         <layout class="QFormLayout" name="settingsForm">
+          <item row="0" column="0"><widget class="QLabel" name="labelServerUrl"><property name="text"><string>API Server:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QLineEdit" name="mServerUrl"><property name="text"><string>https://api.minerva-archive.org</string></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="labelUploadUrl"><property name="text"><string>Upload Server:</string></property></widget></item>
+          <item row="1" column="1"><widget class="QLineEdit" name="mUploadUrl"><property name="text"><string>https://gate.minerva-archive.org</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="labelDlConc"><property name="text"><string>DL Concurrency:</string></property></widget></item>
+          <item row="2" column="1"><widget class="QSpinBox" name="mDlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
+          <item row="3" column="0"><widget class="QLabel" name="labelUlConc"><property name="text"><string>UL Concurrency:</string></property></widget></item>
+          <item row="3" column="1"><widget class="QSpinBox" name="mUlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
+          <item row="4" column="0"><widget class="QLabel" name="labelBatch"><property name="text"><string>Batch Size:</string></property></widget></item>
+          <item row="4" column="1"><widget class="QSpinBox" name="mBatchSize"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>10</number></property></widget></item>
+          <item row="5" column="0"><widget class="QLabel" name="labelAria2c"><property name="text"><string>aria2c Connections:</string></property></widget></item>
+          <item row="5" column="1"><widget class="QSpinBox" name="mAria2cConns"><property name="minimum"><number>1</number></property><property name="maximum"><number>16</number></property><property name="value"><number>8</number></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelRecPlaceholder"><property name="text"><string/></property></widget></item>
+          <item row="6" column="1"><widget class="QPushButton" name="mRecommendBtn"><property name="text"><string>Recommended Settings</string></property><property name="toolTip"><string>Auto-detect system capabilities and run a network speed test to calculate optimal values</string></property></widget></item>
+          <item row="7" column="0"><widget class="QLabel" name="labelTempDir"><property name="text"><string>Temp Dir:</string></property></widget></item>
+          <item row="7" column="1">
+           <layout class="QHBoxLayout" name="tempDirRow">
+            <item><widget class="QLineEdit" name="mTempDir"/></item>
+            <item><widget class="QPushButton" name="browseTempBtn"><property name="text"><string>Browse...</string></property></widget></item>
+           </layout>
+          </item>
+          <item row="8" column="0"><widget class="QLabel" name="labelDlDir"><property name="text"><string>Downloads Dir:</string></property></widget></item>
+          <item row="8" column="1">
+           <layout class="QHBoxLayout" name="dlDirRow">
+            <item><widget class="QLineEdit" name="mDownloadsDir"/></item>
+            <item><widget class="QPushButton" name="browseDlBtn"><property name="text"><string>Browse...</string></property></widget></item>
+           </layout>
+          </item>
+          <item row="9" column="0"><widget class="QLabel" name="labelKeepPlaceholder"><property name="text"><string/></property></widget></item>
+          <item row="9" column="1"><widget class="QCheckBox" name="mKeepFiles"><property name="text"><string>Keep downloaded files after upload</string></property></widget></item>
+          <item row="10" column="0"><widget class="QLabel" name="labelAria2cPlaceholder"><property name="text"><string/></property></widget></item>
+          <item row="10" column="1"><widget class="QLabel" name="mAria2cLabel"><property name="text"><string/></property></widget></item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="advancedBox">
+          <property name="title"><string>Advanced Settings</string></property>
+          <layout class="QFormLayout" name="advancedForm">
+           <item row="0" column="0"><widget class="QLabel" name="labelDlRetryDelay"><property name="text"><string>DL Retry Delay (sec):</string></property></widget></item>
+           <item row="0" column="1"><widget class="QSpinBox" name="mDownloadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>5</number></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="labelUlRetryDelay"><property name="text"><string>UL Retry Delay (sec):</string></property></widget></item>
+           <item row="1" column="1"><widget class="QSpinBox" name="mUploadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>10</number></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelDiskReserve"><property name="text"><string>Disk Reserve (MB):</string></property></widget></item>
+           <item row="2" column="1"><widget class="QSpinBox" name="mDiskReserveMb"><property name="minimum"><number>0</number></property><property name="maximum"><number>100000</number></property><property name="value"><number>500</number></property></widget></item>
+           <item row="3" column="0"><widget class="QLabel" name="labelReportRetries"><property name="text"><string>Report Retries:</string></property></widget></item>
+           <item row="3" column="1"><widget class="QSpinBox" name="mReportRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>20</number></property></widget></item>
+           <item row="4" column="0"><widget class="QLabel" name="labelQueuePrefetch"><property name="text"><string>Queue Prefetch:</string></property></widget></item>
+           <item row="4" column="1"><widget class="QSpinBox" name="mQueuePrefetch"><property name="minimum"><number>1</number></property><property name="maximum"><number>20</number></property><property name="value"><number>2</number></property></widget></item>
+           <item row="5" column="0"><widget class="QLabel" name="labelChunkSize"><property name="text"><string>Upload Chunk Size (MB):</string></property></widget></item>
+           <item row="5" column="1"><widget class="QSpinBox" name="mUploadChunkSizeMb"><property name="minimum"><number>1</number></property><property name="maximum"><number>64</number></property><property name="value"><number>8</number></property></widget></item>
+           <item row="6" column="0"><widget class="QLabel" name="labelStartRetries"><property name="text"><string>UL Start Retries:</string></property></widget></item>
+           <item row="6" column="1"><widget class="QSpinBox" name="mUploadStartRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
+           <item row="7" column="0"><widget class="QLabel" name="labelChunkRetries"><property name="text"><string>UL Chunk Retries:</string></property></widget></item>
+           <item row="7" column="1"><widget class="QSpinBox" name="mUploadChunkRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>30</number></property></widget></item>
+           <item row="8" column="0"><widget class="QLabel" name="labelFinishRetries"><property name="text"><string>UL Finish Retries:</string></property></widget></item>
+           <item row="8" column="1"><widget class="QSpinBox" name="mUploadFinishRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
+           <item row="9" column="0"><widget class="QLabel" name="labelUlRetryCap"><property name="text"><string>UL Retry Cap (sec):</string></property></widget></item>
+           <item row="9" column="1"><widget class="QDoubleSpinBox" name="mUploadRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>25.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
+           <item row="10" column="0"><widget class="QLabel" name="labelChunkRetryCap"><property name="text"><string>UL Chunk Retry Cap (sec):</string></property></widget></item>
+           <item row="10" column="1"><widget class="QDoubleSpinBox" name="mUploadChunkRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>20.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
+           <item row="11" column="0"><widget class="QLabel" name="labelUiInterval"><property name="text"><string>UI Update Interval (ms):</string></property></widget></item>
+           <item row="11" column="1"><widget class="QSpinBox" name="mUiUpdateInterval"><property name="minimum"><number>10</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>50</number></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="statusBox">
+          <property name="title"><string>Server Connection Status</string></property>
+          <layout class="QFormLayout" name="statusGrid">
+           <item row="0" column="0"><widget class="QLabel" name="labelSrvVersion"><property name="text"><string>API /worker/version:</string></property></widget></item>
+           <item row="0" column="1"><widget class="QLabel" name="mStatusApiVersion"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="labelSrvJobs"><property name="text"><string>API /api/jobs:</string></property></widget></item>
+           <item row="1" column="1"><widget class="QLabel" name="mStatusApiJobs"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelSrvReport"><property name="text"><string>API /api/jobs/report:</string></property></widget></item>
+           <item row="2" column="1"><widget class="QLabel" name="mStatusApiReport"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+           <item row="3" column="0"><widget class="QLabel" name="labelSrvLb"><property name="text"><string>API /api/leaderboard:</string></property></widget></item>
+           <item row="3" column="1"><widget class="QLabel" name="mStatusApiLeaderboard"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+           <item row="4" column="0"><widget class="QLabel" name="labelSrvGate"><property name="text"><string>Gate /api/upload:</string></property></widget></item>
+           <item row="4" column="1"><widget class="QLabel" name="mStatusGateUpload"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+           <item row="5" column="0"><widget class="QLabel" name="labelSrvBtnPlaceholder"><property name="text"><string/></property></widget></item>
+           <item row="5" column="1"><widget class="QPushButton" name="mCheckServersBtn"><property name="text"><string>Check Servers</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="settingsBottomSpacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="logTab">
+       <attribute name="title"><string>Log</string></attribute>
+       <layout class="QVBoxLayout" name="logLayout">
+        <item>
+         <widget class="QPlainTextEdit" name="mLogView">
+          <property name="readOnly"><bool>true</bool></property>
+          <property name="maximumBlockCount"><number>5000</number></property>
+          <property name="font"><font><family>Consolas</family><pointsize>9</pointsize></font></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="lbTab">
+       <attribute name="title"><string>Leaderboard</string></attribute>
+       <layout class="QVBoxLayout" name="lbLayout" stretch="0,1">
+        <item>
+         <layout class="QHBoxLayout" name="lbTopRow">
+          <item>
+           <widget class="QLineEdit" name="mLbSearch">
+            <property name="placeholderText"><string>Search users...</string></property>
+            <property name="clearButtonEnabled"><bool>true</bool></property>
+            <property name="maximumSize"><size><width>250</width><height>16777215</height></size></property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="lbStretch">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="mLbCountLabel">
+            <property name="text"><string/></property>
+            <property name="styleSheet"><string>color: #888; font-size: 10px;</string></property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="lbSpacer">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>12</width><height>0</height></size></property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="mLbRefreshLabel">
+            <property name="text"><string>Refresh</string></property>
+            <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+            <property name="styleSheet"><string>QLabel { color: #2980b9; font-size: 11px; padding: 4px 8px; } QLabel:hover { color: #3498db; text-decoration: underline; } QLabel:disabled { color: #888; }</string></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="mLbTable">
+          <property name="columnCount"><number>5</number></property>
+          <property name="rowCount"><number>0</number></property>
+          <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+          <property name="selectionMode"><enum>QAbstractItemView::NoSelection</enum></property>
+          <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+          <property name="iconSize"><size><width>24</width><height>24</height></size></property>
+          <property name="styleSheet"><string>QTableWidget::item { padding: 2px; } QTableWidget::item:focus { border: none; outline: none; }</string></property>
+          <column><property name="text"><string>Rank</string></property></column>
+          <column><property name="text"><string/></property></column>
+          <column><property name="text"><string>Username</string></property></column>
+          <column><property name="text"><string>Contributed</string></property></column>
+          <column><property name="text"><string>Files</string></property></column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0a0a0b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield shape -->
+  <path d="M128 16 L224 56 L224 128 C224 185 183 228 128 244 C73 228 32 185 32 128 L32 56 Z"
+        fill="url(#bg)" stroke="url(#accent)" stroke-width="6"/>
+  <!-- Inner glow -->
+  <path d="M128 28 L214 64 L214 128 C214 179 177 218 128 233 C79 218 42 179 42 128 L42 64 Z"
+        fill="url(#glow)"/>
+  <!-- Stylized M -->
+  <path d="M72 170 L72 90 L104 140 L128 100 L152 140 L184 90 L184 170"
+        fill="none" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Small archive bars at bottom -->
+  <rect x="88" y="180" width="80" height="4" rx="2" fill="#a78bfa" opacity="0.6"/>
+  <rect x="98" y="190" width="60" height="4" rx="2" fill="#a78bfa" opacity="0.4"/>
+  <rect x="108" y="200" width="40" height="4" rx="2" fill="#a78bfa" opacity="0.2"/>
+</svg>
