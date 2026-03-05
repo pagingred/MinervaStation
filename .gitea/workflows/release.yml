@@ -237,17 +237,26 @@ jobs:
       - name: Deploy Qt Libraries
         shell: bash
         run: |
+          set +e
           for QT_PATH in ~/Qt/6.11.0/macos ~/Qt/6.9.0/macos ~/Qt/6.8.0/macos /opt/homebrew/opt/qt@6; do
             [ -f "$QT_PATH/bin/macdeployqt" ] && break
           done
           export PATH="$QT_PATH/bin:$PATH"
-          echo "Using macdeployqt from: $QT_PATH/bin"
+          echo "Using macdeployqt from: $(which macdeployqt)"
 
           cd build
           APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
           echo "Found app bundle: $APP_NAME"
+          ls -la "$APP_NAME/Contents/MacOS/" 2>/dev/null
           if [ -n "$APP_NAME" ]; then
-            macdeployqt "$APP_NAME" -verbose=1
+            macdeployqt "$APP_NAME" -verbose=1 2>&1
+            RC=$?
+            echo "macdeployqt exit code: $RC"
+            if [ $RC -ne 0 ]; then
+              echo "macdeployqt failed, listing app bundle:"
+              ls -laR "$APP_NAME/Contents/" | head -40
+              exit $RC
+            fi
             [ "$APP_NAME" != "MinervaStation.app" ] && mv "$APP_NAME" MinervaStation.app
           fi
 
