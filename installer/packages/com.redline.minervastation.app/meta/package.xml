@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+    <DisplayName>MinervaStation Application</DisplayName>
+    <Description>Worker node for the Minerva Archive project. Includes Qt runtime libraries.</Description>
+    <Version>1.0.0</Version>
+    <ReleaseDate>2026-03-04</ReleaseDate>
+    <Name>com.redline.minervastation.app</Name>
+    <Default>true</Default>
+    <Essential>false</Essential>
+    <ForcedInstallation>true</ForcedInstallation>
+    <SortingPriority>10</SortingPriority>
+</Package>

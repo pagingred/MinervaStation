@@ -1,0 +1,147 @@
+name: CI Build
+
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+    paths-ignore:
+      - '**.md'
+
+env:
+  QT_VERSION: "6.11.0"
+
+jobs:
+  build-windows:
+    runs-on: windows
+    if: "!startsWith(github.ref, 'refs/tags/')"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup Qt
+        shell: bash
+        run: |
+          if [ ! -f "C:/Qt/6.11.0/msvc2022_64/bin/qmake.exe" ]; then
+            echo "Qt not found, installing..."
+            pip install aqtinstall
+            python3 -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 -O C:/Qt
+          fi
+          echo "qmake: $(ls C:/Qt/6.11.0/msvc2022_64/bin/qmake.exe 2>&1)"
+
+      - name: Build
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\6.11.0\msvc2022_64\bin;C:\Qt\Tools\QtCreator\bin\jom;%PATH%
+
+          if not exist build mkdir build
+          cd build
+
+          echo === Running qmake ===
+          qmake.exe ..\MinervaStation.pro -spec win32-msvc "CONFIG+=release"
+          if errorlevel 1 exit /b 1
+
+          echo === Building with jom ===
+          jom.exe -j %NUMBER_OF_PROCESSORS%
+          if errorlevel 1 exit /b 1
+
+          echo === Build successful ===
+
+      - name: Deploy Qt (verify packaging works)
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\6.11.0\msvc2022_64\bin;%PATH%
+
+          cd build\release
+          windeployqt6.exe --release --no-translations MinervaStation.exe
+          if errorlevel 1 exit /b 1
+
+          echo === windeployqt successful ===
+
+  build-linux:
+    runs-on: ubuntu
+    if: "!startsWith(github.ref, 'refs/tags/')"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          if command -v sudo &> /dev/null; then SUDO="sudo"; else SUDO=""; fi
+          $SUDO apt-get update || true
+          $SUDO apt-get install -y build-essential libgl1-mesa-dev zlib1g-dev libfontconfig1-dev libfreetype-dev libxkbcommon-dev
+
+      - name: Setup Qt
+        shell: bash
+        run: |
+          QT_DIR="/opt/Qt/6.11.0/gcc_64"
+          if [ ! -f "$QT_DIR/bin/qmake" ]; then
+            echo "Qt not found at $QT_DIR, installing..."
+            pip install aqtinstall || pip install --break-system-packages aqtinstall
+            python3 -m aqt install-qt linux desktop 6.11.0 linux_gcc_64 -O /opt/Qt
+          fi
+          echo "Using: $($QT_DIR/bin/qmake --version 2>&1 | head -2)"
+
+      - name: Build
+        shell: bash
+        run: |
+          export PATH="/opt/Qt/6.11.0/gcc_64/bin:$PATH"
+          export LD_LIBRARY_PATH="/opt/Qt/6.11.0/gcc_64/lib:$LD_LIBRARY_PATH"
+
+          echo "Using: $(which qmake) - $(qmake --version | head -2)"
+
+          mkdir -p build && cd build
+          qmake ../MinervaStation.pro -spec linux-g++ "CONFIG+=release"
+          make -j$(nproc)
+
+  build-macos:
+    runs-on: macos
+    if: "!startsWith(github.ref, 'refs/tags/')"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Qt
+        shell: bash
+        run: |
+          echo "HOME=$HOME, USER=$(whoami)"
+          QT_DIR="$HOME/Qt/6.11.0/macos"
+          if [ ! -f "$QT_DIR/bin/qmake" ]; then
+            echo "Qt not found at $QT_DIR, installing..."
+            pip3 install aqtinstall || { echo "pip3 failed, trying brew"; brew install python3 && pip3 install aqtinstall; }
+            python3 -m aqt install-qt mac desktop 6.11.0 clang_64 -O "$HOME/Qt"
+          fi
+          echo "qmake location: $(ls $QT_DIR/bin/qmake 2>&1)"
+          "$QT_DIR/bin/qmake" --version || { echo "FATAL: qmake not working"; exit 1; }
+
+      - name: Build
+        shell: bash
+        run: |
+          export PATH="$HOME/Qt/6.11.0/macos/bin:$PATH"
+
+          echo "Using: $(qmake --version | head -2)"
+
+          mkdir -p build && cd build
+          qmake ../MinervaStation.pro -spec macx-clang "CONFIG+=release"
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Deploy Qt (verify packaging works)
+        shell: bash
+        run: |
+          export PATH="$HOME/Qt/6.11.0/macos/bin:$PATH"
+
+          cd build
+          APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
+          if [ -n "$APP_NAME" ]; then
+            macdeployqt "$APP_NAME" -verbose=1
+          fi

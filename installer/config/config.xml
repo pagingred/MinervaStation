@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>MinervaStation</Name>
+    <Version>1.0.0</Version>
+    <Title>MinervaStation</Title>
+    <Publisher>RedLine Solutions LLC</Publisher>
+    <StartMenuDir>MinervaStation</StartMenuDir>
+    <TargetDir>@HomeDir@/MinervaStation</TargetDir>
+
+    <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
+    <AllowSpaceInPath>true</AllowSpaceInPath>
+
+    <RemoteRepositories>
+        <Repository>
+            <Url>https://repo.redline.llc/minervastation-win/repo</Url>
+            <Enabled>1</Enabled>
+            <DisplayName>MinervaStation Updates</DisplayName>
+        </Repository>
+    </RemoteRepositories>
+
+    <MaintenanceToolName>MinervaStationMaintenanceTool</MaintenanceToolName>
+    <MaintenanceToolIniFile>MinervaStationMaintenanceTool.ini</MaintenanceToolIniFile>
+
+    <InstallActionColumnVisible>true</InstallActionColumnVisible>
+
+    <WizardStyle>Modern</WizardStyle>
+    <WizardDefaultWidth>800</WizardDefaultWidth>
+    <WizardDefaultHeight>600</WizardDefaultHeight>
+</Installer>
