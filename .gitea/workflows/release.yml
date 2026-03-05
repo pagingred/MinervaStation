@@ -1,0 +1,482 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'        # stable: v1.0.0
+      - 'v[0-9]+.[0-9]+.[0-9]+-alpha*'  # alpha: v1.0.0-alpha1
+      - 'v[0-9]+.[0-9]+.[0-9]+-test*'   # tester: v1.0.0-test1
+
+env:
+  REPO_MANAGER: https://repo-manager.redline.llc
+  PROJECT: minervastation
+
+jobs:
+  # ===========================================================================
+  # Prepare - Extract version, ensure releases exist in repo-manager
+  # ===========================================================================
+  prepare:
+    runs-on: ubuntu
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      clean_version: ${{ steps.ver.outputs.clean_version }}
+      channel: ${{ steps.ver.outputs.channel }}
+    steps:
+      - name: Extract version info
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          if [[ "$TAG" == *"-alpha"* ]]; then
+            CHANNEL="alpha"
+          elif [[ "$TAG" == *"-test"* ]]; then
+            CHANNEL="tester"
+          else
+            CHANNEL="stable"
+          fi
+
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/-alpha.*//' | sed 's/-test.*//')
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (clean: $CLEAN_VERSION) for channel: $CHANNEL"
+
+      - name: Ensure releases in repo-manager
+        run: |
+          VERSION="${{ steps.ver.outputs.clean_version }}"
+          echo "Ensuring release $VERSION across all platforms..."
+          curl -sf -X POST \
+            -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\": \"$VERSION\"}" \
+            "$REPO_MANAGER/api/pipeline/ensure-release-all/${PROJECT}"
+
+  # ===========================================================================
+  # Windows Build
+  # ===========================================================================
+  build-windows:
+    runs-on: windows
+    needs: prepare
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CLEAN_VERSION: ${{ needs.prepare.outputs.clean_version }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build Release
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\6.11.0\msvc2022_64\bin;C:\Qt\Tools\QtCreator\bin\jom;%PATH%
+
+          if not exist build mkdir build
+          cd build
+
+          qmake.exe ..\MinervaStation.pro -spec win32-msvc "CONFIG+=release"
+          if errorlevel 1 exit /b 1
+
+          jom.exe -j %NUMBER_OF_PROCESSORS%
+          if errorlevel 1 exit /b 1
+
+      - name: Deploy Qt Libraries
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\6.11.0\msvc2022_64\bin;%PATH%
+
+          cd build\release
+          windeployqt6.exe --release --no-translations MinervaStation.exe
+          if errorlevel 1 exit /b 1
+
+      - name: Package for Installer
+        shell: cmd
+        run: |
+          set APP_DATA=installer\packages\com.redline.minervastation.app\data
+
+          if exist "%APP_DATA%" rmdir /s /q "%APP_DATA%"
+          mkdir "%APP_DATA%"
+
+          xcopy /s /e /y /q "build\release\*" "%APP_DATA%\" >nul
+
+      - name: Update Package Versions
+        shell: powershell
+        run: |
+          $VERSION = $env:CLEAN_VERSION
+          $TODAY = Get-Date -Format "yyyy-MM-dd"
+
+          Get-ChildItem -Path "installer\packages" -Filter "package.xml" -Recurse | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            $content = $content -replace '<Version>.*?</Version>', "<Version>$VERSION</Version>"
+            $content = $content -replace '<ReleaseDate>.*?</ReleaseDate>', "<ReleaseDate>$TODAY</ReleaseDate>"
+            Set-Content -Path $_.FullName -Value $content -NoNewline
+          }
+
+          $configPath = "installer\config\config.xml"
+          $content = Get-Content $configPath -Raw
+          $content = $content -replace '<Version>.*?</Version>', "<Version>$VERSION</Version>"
+          $content = $content -replace '<Url>.*?</Url>', "<Url>https://repo.redline.llc/${env:PROJECT}-win/repo</Url>"
+          Set-Content -Path $configPath -Value $content -NoNewline
+
+      - name: Generate Repository
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\Tools\QtInstallerFramework\4.10\bin;%PATH%
+
+          if exist repository rmdir /s /q repository
+          mkdir repository
+
+          repogen.exe --update-new-components -p installer\packages repository
+          if errorlevel 1 exit /b 1
+
+      - name: Create Offline Installer
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\Tools\QtInstallerFramework\4.10\bin;%PATH%
+          binarycreator.exe --offline-only -c installer\config\config.xml -p installer\packages "MinervaStation-%VERSION%-Windows-Setup.exe"
+          if errorlevel 1 exit /b 1
+
+      - name: Create Online Installer
+        shell: cmd
+        run: |
+          set PATH=C:\Qt\Tools\QtInstallerFramework\4.10\bin;%PATH%
+          binarycreator.exe --online-only -c installer\config\config.xml -p installer\packages "MinervaStation-%VERSION%-Windows-Online.exe"
+          if errorlevel 1 exit /b 1
+
+      - name: Upload components to repo-manager
+        shell: bash
+        run: |
+          DATA_DIR="installer/packages/com.redline.minervastation.app/data"
+          if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
+            echo "Uploading app component..."
+            cd "$DATA_DIR"
+            find . -type f | while read f; do
+              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+                -F "files=@$f" \
+                "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-win/$CLEAN_VERSION/app?clean=true" || true
+            done
+            cd -
+          fi
+
+      - name: Trigger repo-manager build
+        shell: bash
+        run: |
+          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-win" || echo "warn: repo-manager build failed"
+
+      - name: Upload installers to repo-manager
+        shell: bash
+        run: |
+          for type_file in "offline:MinervaStation-${VERSION}-Windows-Setup.exe" "online:MinervaStation-${VERSION}-Windows-Online.exe"; do
+            TYPE="${type_file%%:*}"
+            FILE="${type_file#*:}"
+            if [ -f "$FILE" ]; then
+              echo "Uploading $TYPE installer: $FILE"
+              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+                -F "file=@$FILE" \
+                "$REPO_MANAGER/api/pipeline/upload-installer/${PROJECT}-win/$CLEAN_VERSION?type=$TYPE" || echo "warn: upload failed"
+            fi
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: windows-installers
+          path: |
+            MinervaStation-*-Windows-Setup.exe
+            MinervaStation-*-Windows-Online.exe
+          retention-days: 90
+
+      - name: Upload repository artifact
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: windows-repository
+          path: repository/
+          retention-days: 90
+
+  # ===========================================================================
+  # macOS Build
+  # ===========================================================================
+  build-macos:
+    runs-on: macos
+    needs: prepare
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CLEAN_VERSION: ${{ needs.prepare.outputs.clean_version }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Release
+        shell: bash
+        run: |
+          for QT_PATH in ~/Qt/6.11.0/macos ~/Qt/6.9.0/macos ~/Qt/6.8.0/macos /opt/homebrew/opt/qt@6; do
+            if [ -f "$QT_PATH/bin/qmake" ]; then
+              export PATH="$QT_PATH/bin:$PATH"
+              echo "QT_PATH=$QT_PATH" >> $GITHUB_ENV
+              break
+            fi
+          done
+          which qmake || { echo "ERROR: qmake not found"; exit 1; }
+
+          mkdir -p build && cd build
+          qmake ../MinervaStation.pro -spec macx-clang "CONFIG+=release"
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Deploy Qt Libraries
+        shell: bash
+        run: |
+          export PATH="$QT_PATH/bin:$PATH"
+          cd build
+          APP_NAME=$(ls -d *.app 2>/dev/null | head -1)
+          if [ -n "$APP_NAME" ]; then
+            macdeployqt "$APP_NAME" -verbose=1
+            [ "$APP_NAME" != "MinervaStation.app" ] && mv "$APP_NAME" MinervaStation.app
+          fi
+
+      - name: Package for Installer
+        shell: bash
+        run: |
+          APP_DATA="installer/packages/com.redline.minervastation.app/data"
+
+          rm -rf "$APP_DATA"
+          mkdir -p "$APP_DATA"
+
+          if [ -d "build/MinervaStation.app" ]; then
+            cp -R "build/MinervaStation.app" "$APP_DATA/"
+          fi
+
+      - name: Update Package Versions
+        shell: bash
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          find installer/packages -name "package.xml" -exec sed -i '' \
+            -e "s|<Version>.*</Version>|<Version>$CLEAN_VERSION</Version>|" \
+            -e "s|<ReleaseDate>.*</ReleaseDate>|<ReleaseDate>$TODAY</ReleaseDate>|" {} \;
+
+          [ -f "installer/config/config.xml" ] && sed -i '' \
+            -e "s|<Version>.*</Version>|<Version>$CLEAN_VERSION</Version>|" \
+            -e "s|<Url>.*</Url>|<Url>https://repo.redline.llc/${PROJECT}-mac/repo</Url>|" \
+            installer/config/config.xml
+
+      - name: Generate Repository and Installers
+        shell: bash
+        run: |
+          for IFW_PATH in ~/Qt/Tools/QtInstallerFramework/bin ~/Qt/Tools/QtInstallerFramework/4.10/bin; do
+            [ -f "$IFW_PATH/repogen" ] && export PATH="$IFW_PATH:$PATH" && break
+          done
+          which repogen || { echo "ERROR: Qt IFW not found"; exit 1; }
+
+          rm -rf repository && mkdir repository
+          repogen --update-new-components -p installer/packages repository
+          binarycreator --offline-only -c installer/config/config.xml -p installer/packages "MinervaStation-${VERSION}-macOS-Setup"
+          binarycreator --online-only -c installer/config/config.xml -p installer/packages "MinervaStation-${VERSION}-macOS-Online"
+
+          [ -d "MinervaStation-${VERSION}-macOS-Setup.app" ] && \
+            hdiutil create -volname "MinervaStation Installer" -srcfolder "MinervaStation-${VERSION}-macOS-Setup.app" -ov -format UDZO "MinervaStation-${VERSION}-macOS-Setup.dmg"
+          [ -d "MinervaStation-${VERSION}-macOS-Online.app" ] && \
+            hdiutil create -volname "MinervaStation Online Installer" -srcfolder "MinervaStation-${VERSION}-macOS-Online.app" -ov -format UDZO "MinervaStation-${VERSION}-macOS-Online.dmg"
+
+      - name: Upload to repo-manager
+        shell: bash
+        run: |
+          for type_file in "offline:MinervaStation-${VERSION}-macOS-Setup.dmg" "online:MinervaStation-${VERSION}-macOS-Online.dmg"; do
+            TYPE="${type_file%%:*}"
+            FILE="${type_file#*:}"
+            [ -f "$FILE" ] && curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+              -F "file=@$FILE" \
+              "$REPO_MANAGER/api/pipeline/upload-installer/${PROJECT}-mac/$CLEAN_VERSION?type=$TYPE" || true
+          done
+
+          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-mac" || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: macos-installers
+          path: |
+            MinervaStation-*-macOS-Setup.dmg
+            MinervaStation-*-macOS-Online.dmg
+          retention-days: 90
+
+      - name: Upload repository artifact
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: macos-repository
+          path: repository/
+          retention-days: 90
+
+  # ===========================================================================
+  # Linux Build
+  # ===========================================================================
+  build-linux:
+    runs-on: ubuntu
+    needs: prepare
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CLEAN_VERSION: ${{ needs.prepare.outputs.clean_version }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          if command -v sudo &> /dev/null; then SUDO="sudo"; else SUDO=""; fi
+          $SUDO apt-get update || true
+          $SUDO apt-get install -y build-essential libgl1-mesa-dev zlib1g-dev libfontconfig1-dev libfreetype-dev libxkbcommon-dev
+
+      - name: Build Release
+        run: |
+          for QT_PATH in ~/Qt/6.11.0/gcc_64 /opt/Qt/6.11.0/gcc_64; do
+            if [ -f "$QT_PATH/bin/qmake" ]; then
+              export PATH="$QT_PATH/bin:$PATH"
+              export LD_LIBRARY_PATH="$QT_PATH/lib:$LD_LIBRARY_PATH"
+              echo "QT_PATH=$QT_PATH" >> $GITHUB_ENV
+              break
+            fi
+          done
+          which qmake || { echo "ERROR: qmake not found"; exit 1; }
+
+          mkdir -p build && cd build
+          qmake ../MinervaStation.pro -spec linux-g++ "CONFIG+=release"
+          make -j$(nproc)
+
+      - name: Package for Installer
+        run: |
+          APP_DATA="installer/packages/com.redline.minervastation.app/data"
+
+          rm -rf "$APP_DATA"
+          mkdir -p "$APP_DATA"
+
+          [ -f "build/MinervaStation" ] && cp "build/MinervaStation" "$APP_DATA/MinervaStation" && chmod +x "$APP_DATA/MinervaStation"
+
+          if [ -n "$QT_PATH" ] && [ -d "$QT_PATH/lib" ]; then
+            mkdir -p "$APP_DATA/lib" "$APP_DATA/plugins/platforms"
+            for lib in Core Gui Widgets Network; do
+              [ -f "$QT_PATH/lib/libQt6${lib}.so.6" ] && cp "$QT_PATH/lib/libQt6${lib}.so.6" "$APP_DATA/lib/"
+            done
+            [ -d "$QT_PATH/plugins/platforms" ] && cp "$QT_PATH/plugins/platforms/"*.so "$APP_DATA/plugins/platforms/" 2>/dev/null || true
+          fi
+
+      - name: Update Package Versions
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          find installer/packages -name "package.xml" -exec sed -i \
+            -e "s|<Version>.*</Version>|<Version>$CLEAN_VERSION</Version>|" \
+            -e "s|<ReleaseDate>.*</ReleaseDate>|<ReleaseDate>$TODAY</ReleaseDate>|" {} \;
+
+          [ -f "installer/config/config.xml" ] && sed -i \
+            -e "s|<Version>.*</Version>|<Version>$CLEAN_VERSION</Version>|" \
+            -e "s|<Url>.*</Url>|<Url>https://repo.redline.llc/${PROJECT}-linux/repo</Url>|" \
+            installer/config/config.xml
+
+      - name: Generate Repository and Installers
+        run: |
+          for IFW_PATH in ~/Qt/Tools/QtInstallerFramework/4.8/bin /opt/Qt/Tools/QtInstallerFramework/4.8/bin; do
+            [ -f "$IFW_PATH/repogen" ] && export PATH="$IFW_PATH:$PATH" && break
+          done
+          which repogen || { echo "ERROR: Qt IFW not found"; exit 1; }
+
+          rm -rf repository && mkdir repository
+          repogen --update-new-components -p installer/packages repository
+          binarycreator --offline-only -c installer/config/config.xml -p installer/packages "MinervaStation-${VERSION}-Linux-Setup.run"
+          binarycreator --online-only -c installer/config/config.xml -p installer/packages "MinervaStation-${VERSION}-Linux-Online.run"
+          chmod +x MinervaStation-*.run
+
+      - name: Upload to repo-manager
+        run: |
+          for type_file in "offline:MinervaStation-${VERSION}-Linux-Setup.run" "online:MinervaStation-${VERSION}-Linux-Online.run"; do
+            TYPE="${type_file%%:*}"
+            FILE="${type_file#*:}"
+            [ -f "$FILE" ] && curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+              -F "file=@$FILE" \
+              "$REPO_MANAGER/api/pipeline/upload-installer/${PROJECT}-linux/$CLEAN_VERSION?type=$TYPE" || true
+          done
+
+          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-linux" || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: linux-installers
+          path: |
+            MinervaStation-*-Linux-Setup.run
+            MinervaStation-*-Linux-Online.run
+          retention-days: 90
+
+      - name: Upload repository artifact
+        uses: actions/upload-artifact@v3
+        continue-on-error: true
+        with:
+          name: linux-repository
+          path: repository/
+          retention-days: 90
+
+  # ===========================================================================
+  # Deploy - Merge repositories and create Gitea release
+  # ===========================================================================
+  deploy:
+    runs-on: ubuntu
+    needs: [prepare, build-windows, build-macos, build-linux]
+    if: always() && needs.prepare.result == 'success'
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        continue-on-error: true
+        with:
+          path: artifacts
+
+      - name: Collect all installers
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "MinervaStation-*.exe" -o -name "MinervaStation-*.dmg" -o -name "MinervaStation-*.run" \) -exec cp {} release/ \;
+          echo "Collected installers:"
+          ls -la release/ || echo "No installers found"
+
+      - name: Create Gitea Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "v${{ env.VERSION }}"
+          files: release/*
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'test') }}
+          body: |
+            ## MinervaStation v${{ env.VERSION }} (${{ env.CHANNEL }})
+
+            ### Downloads
+            | Platform | Offline Installer | Online Installer |
+            |----------|------------------|------------------|
+            | Windows  | MinervaStation-${{ env.VERSION }}-Windows-Setup.exe | MinervaStation-${{ env.VERSION }}-Windows-Online.exe |
+            | macOS    | MinervaStation-${{ env.VERSION }}-macOS-Setup.dmg | MinervaStation-${{ env.VERSION }}-macOS-Online.dmg |
+            | Linux    | MinervaStation-${{ env.VERSION }}-Linux-Setup.run | MinervaStation-${{ env.VERSION }}-Linux-Online.run |
+
+            ### Online Repository
+            Existing installations can update automatically via the built-in updater.
+
+            Repository URLs:
+            - Windows: `https://repo.redline.llc/minervastation-win/repo/`
+            - macOS: `https://repo.redline.llc/minervastation-mac/repo/`
+            - Linux: `https://repo.redline.llc/minervastation-linux/repo/`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
