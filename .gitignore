@@ -54,4 +54,5 @@ compile_commands.json
 *_qmlcache.qrc
 
 /build/
+/release/
 build.bat
