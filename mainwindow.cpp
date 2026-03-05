@@ -53,6 +53,11 @@ static QString avatarCachePath()
     return QCoreApplication::applicationDirPath() + "/avatar.png";
 }
 
+static QString fmtBytes(qint64 aBytes)
+{
+    return QLocale().formattedDataSize(aBytes, 1, QLocale::DataSizeSIFormat);
+}
+
 MainWindow::~MainWindow()
 {
     delete ui;
@@ -519,14 +524,14 @@ void MainWindow::FlushJobUpdates()
                 else
                 {
                     bar->setFormat(QString("%1 / %2  (%p%)")
-                                       .arg(QLocale().formattedDataSize(aState.progress))
-                                       .arg(QLocale().formattedDataSize(effectiveTotal)));
+                                       .arg(fmtBytes(aState.progress))
+                                       .arg(fmtBytes(effectiveTotal)));
                 }
             }
             else if (aState.progress > 0)
             {
                 bar->setMaximum(0);
-                bar->setFormat(QLocale().formattedDataSize(aState.progress));
+                bar->setFormat(fmtBytes(aState.progress));
             }
             else if (aState.phase == JobPhase::UploadRetryWait ||
                      aState.phase == JobPhase::Queued ||
@@ -722,7 +727,7 @@ void MainWindow::LbAppendPageData(const QJsonArray &aRows, int aPage)
             if (e.username.compare(mLoggedInUsername, Qt::CaseInsensitive) == 0)
             {
                 ui->mRankLabel->setText(QString("#%1").arg(e.rank));
-                ui->mVerifiedLabel->setText(QLocale().formattedDataSize(e.bytes));
+                ui->mVerifiedLabel->setText(fmtBytes(e.bytes));
                 found = true;
                 break;
             }
@@ -807,7 +812,7 @@ void MainWindow::LbRefreshDisplay()
         ui->mLbTable->setItem(row, 1, avatarItem);
 
         ui->mLbTable->setItem(row, 2, new QTableWidgetItem(lr.username));
-        ui->mLbTable->setItem(row, 3, new QTableWidgetItem(QLocale().formattedDataSize(lr.bytes)));
+        ui->mLbTable->setItem(row, 3, new QTableWidgetItem(fmtBytes(lr.bytes)));
 
         QTableWidgetItem *filesItem = new QTableWidgetItem();
         filesItem->setData(Qt::DisplayRole, lr.files);
@@ -1004,7 +1009,7 @@ void MainWindow::AddFinishedRow(int aFileId, const JobState &aState)
     ui->mFinishedTable->setItem(0, 1, new QTableWidgetItem(MinervaWorker::PrettyPath(aState.info.destPath)));
 
     qint64 sizeBytes = aState.info.size > 0 ? aState.info.size : aState.total;
-    QString sizeStr = sizeBytes > 0 ? QLocale().formattedDataSize(sizeBytes) : QString();
+    QString sizeStr = sizeBytes > 0 ? fmtBytes(sizeBytes) : QString();
     ui->mFinishedTable->setItem(0, 2, new QTableWidgetItem(sizeStr));
     ui->mFinishedTable->item(0, 2)->setData(Qt::UserRole, sizeBytes);
 
@@ -1303,15 +1308,15 @@ void MainWindow::OnRecommendedSettings()
     if (sysInfo.totalRamBytes > 0)
     {
         sysForm->addRow("RAM:", new QLabel(QString("%1 total, %2 available")
-                                               .arg(QLocale().formattedDataSize(sysInfo.totalRamBytes))
-                                               .arg(QLocale().formattedDataSize(sysInfo.availRamBytes))));
+                                               .arg(fmtBytes(sysInfo.totalRamBytes))
+                                               .arg(fmtBytes(sysInfo.availRamBytes))));
     }
     sysForm->addRow("Disk Type:", new QLabel(sysInfo.diskType));
     if (sysInfo.diskTotalBytes > 0)
     {
         sysForm->addRow("Disk Space:", new QLabel(QString("%1 free of %2")
-                                                      .arg(QLocale().formattedDataSize(sysInfo.diskFreeBytes))
-                                                      .arg(QLocale().formattedDataSize(sysInfo.diskTotalBytes))));
+                                                      .arg(fmtBytes(sysInfo.diskFreeBytes))
+                                                      .arg(fmtBytes(sysInfo.diskTotalBytes))));
     }
     layout->addWidget(sysBox);
 
@@ -1495,8 +1500,8 @@ void MainWindow::UpdateUptime()
         ui->mDlSpeedLabel->setText(fmtSpeed(mSmoothDlSpeed));
         ui->mUlSpeedLabel->setText(fmtSpeed(mSmoothUlSpeed));
 
-        ui->mDownloadedLabel->setText(QLocale().formattedDataSize(liveDl));
-        ui->mUploadedLabel->setText(QLocale().formattedDataSize(liveUl));
+        ui->mDownloadedLabel->setText(fmtBytes(liveDl));
+        ui->mUploadedLabel->setText(fmtBytes(liveUl));
     }
 
     ui->mUploadQueueLabel->setText(QString("Upload Queue (%1)").arg(ui->mUploadTable->rowCount()));
@@ -1554,7 +1559,7 @@ void MainWindow::UpdateDiskUsage()
         if (si.isValid() && si.bytesTotal() > 0)
         {
             return QString("%1 free")
-            .arg(QLocale().formattedDataSize(si.bytesAvailable()));
+            .arg(fmtBytes(si.bytesAvailable()));
         }
 
         QStorageInfo best;
@@ -1573,7 +1578,7 @@ void MainWindow::UpdateDiskUsage()
         if (best.isValid())
         {
             return QString("%1 free")
-            .arg(QLocale().formattedDataSize(best.bytesAvailable()));
+            .arg(fmtBytes(best.bytesAvailable()));
         }
         return "N/A";
     };

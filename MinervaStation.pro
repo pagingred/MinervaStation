@@ -10,5 +10,4 @@ HEADERS += $$files($$PWD/*.h) \
 FORMS += mainwindow.ui
 
 win32: RC_FILE = app.rc
-macx:  ICON = icon.icns
 RESOURCES += resources.qrc
