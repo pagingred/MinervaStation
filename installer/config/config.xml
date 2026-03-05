@@ -26,4 +26,9 @@
     <WizardStyle>Modern</WizardStyle>
     <WizardDefaultWidth>800</WizardDefaultWidth>
     <WizardDefaultHeight>600</WizardDefaultHeight>
+
+    <InstallerWindowIcon>icon</InstallerWindowIcon>
+    <InstallerApplicationIcon>icon</InstallerApplicationIcon>
+    <Logo>logo.png</Logo>
+    <Banner>banner.png</Banner>
 </Installer>
