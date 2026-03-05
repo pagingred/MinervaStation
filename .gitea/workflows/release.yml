@@ -302,7 +302,28 @@ jobs:
           [ -d "MinervaStation-${VERSION}-macOS-Online.app" ] && \
             hdiutil create -volname "MinervaStation Online Installer" -srcfolder "MinervaStation-${VERSION}-macOS-Online.app" -ov -format UDZO "MinervaStation-${VERSION}-macOS-Online.dmg"
 
-      - name: Upload to repo-manager
+      - name: Upload components to repo-manager
+        shell: bash
+        run: |
+          DATA_DIR="installer/packages/com.redline.minervastation.app/data"
+          if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
+            echo "Uploading app component..."
+            cd "$DATA_DIR"
+            find . -type f | while read f; do
+              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+                -F "files=@$f" \
+                "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-mac/$CLEAN_VERSION/app?clean=true" || true
+            done
+            cd -
+          fi
+
+      - name: Trigger repo-manager build
+        shell: bash
+        run: |
+          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-mac" || echo "warn: repo-manager build failed"
+
+      - name: Upload installers to repo-manager
         shell: bash
         run: |
           for type_file in "offline:MinervaStation-${VERSION}-macOS-Setup.dmg" "online:MinervaStation-${VERSION}-macOS-Online.dmg"; do
@@ -312,9 +333,6 @@ jobs:
               -F "file=@$FILE" \
               "$REPO_MANAGER/api/pipeline/upload-installer/${PROJECT}-mac/$CLEAN_VERSION?type=$TYPE" || true
           done
-
-          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
-            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-mac" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -418,7 +436,26 @@ jobs:
           binarycreator --online-only -c installer/config/config.xml -p installer/packages "MinervaStation-${VERSION}-Linux-Online.run"
           chmod +x MinervaStation-*.run
 
-      - name: Upload to repo-manager
+      - name: Upload components to repo-manager
+        run: |
+          DATA_DIR="installer/packages/com.redline.minervastation.app/data"
+          if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
+            echo "Uploading app component..."
+            cd "$DATA_DIR"
+            find . -type f | while read f; do
+              curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+                -F "files=@$f" \
+                "$REPO_MANAGER/api/pipeline/upload/${PROJECT}-linux/$CLEAN_VERSION/app?clean=true" || true
+            done
+            cd -
+          fi
+
+      - name: Trigger repo-manager build
+        run: |
+          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
+            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-linux" || echo "warn: repo-manager build failed"
+
+      - name: Upload installers to repo-manager
         run: |
           for type_file in "offline:MinervaStation-${VERSION}-Linux-Setup.run" "online:MinervaStation-${VERSION}-Linux-Online.run"; do
             TYPE="${type_file%%:*}"
@@ -427,9 +464,6 @@ jobs:
               -F "file=@$FILE" \
               "$REPO_MANAGER/api/pipeline/upload-installer/${PROJECT}-linux/$CLEAN_VERSION?type=$TYPE" || true
           done
-
-          curl -sf -X POST -H "X-API-Key: ${{ secrets.REPO_MANAGER_KEY }}" \
-            "$REPO_MANAGER/api/pipeline/build/${PROJECT}-linux" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
