@@ -187,7 +187,7 @@ void DownloadManager::StartAria2c(const QString &aUrl, const QString &aDestPath,
     });
     mPollTimer->start(1000);
 
-    connect(mAria2c, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, aDestPath](int exitCode, QProcess::ExitStatus)
+    connect(mAria2c, &QProcess::finished, this, [this, aDestPath](int exitCode, QProcess::ExitStatus)
             {
                 if (mPollTimer)
                 {
@@ -202,7 +202,9 @@ void DownloadManager::StartAria2c(const QString &aUrl, const QString &aDestPath,
                         QFileInfo fi(aDestPath);
                         qint64 finalSize = fi.exists() ? fi.size() : mKnownSize;
                         if (finalSize > 0)
+                        {
                             emit Progress(finalSize, finalSize);
+                        }
 
                         emit Finished(true, {});
                     }
