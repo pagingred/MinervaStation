@@ -100,6 +100,8 @@ private:
 
     int mLbSortCol = 0;
     bool mLbSortAsc = true;
+    int mLbUserPage = 1;
+    QVector<int> mLbLastVisiblePages;
 
     QNetworkAccessManager *mAvatarNam;
     QMap<QString, QPixmap> mAvatarCache;

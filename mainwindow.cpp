@@ -795,6 +795,7 @@ void MainWindow::LbAppendPageData(const QJsonArray &aRows, int aPage)
             {
                 ui->mRankLabel->setText(QString("#%1").arg(e.rank));
                 ui->mVerifiedLabel->setText(fmtBytes(e.bytes));
+                mLbUserPage = (e.rank - 1) / 50 + 1;
                 found = true;
                 break;
             }
@@ -1010,55 +1011,62 @@ void MainWindow::LbFetchPage(int aPage)
 
 void MainWindow::LbRefreshVisible()
 {
-    if (mLbAllRows.isEmpty() || mLbFetchingPage)
+    if (mLbFetchingPage)
     {
         return;
     }
 
-    if (ui->mTabs->currentWidget() != ui->mLbTable->parentWidget())
-    {
-        return;
-    }
-
-    int firstRow = ui->mLbTable->rowAt(0);
-    int lastRow = ui->mLbTable->rowAt(ui->mLbTable->viewport()->height() - 1);
-    if (firstRow < 0)
-    {
-        firstRow = 0;
-    }
-    if (lastRow < 0 || lastRow >= mLbRealRowCount)
-    {
-        lastRow = mLbRealRowCount - 1;
-    }
-    if (lastRow < 0)
-    {
-        return;
-    }
-
-    QSet<int> pages;
-    for (int r = firstRow; r <= lastRow; ++r)
-    {
-        QTableWidgetItem *item = ui->mLbTable->item(r, 0);
-        if (!item)
-        {
-            continue;
-        }
-        int rank = item->data(Qt::DisplayRole).toInt();
-        if (rank > 0)
-        {
-            pages.insert((rank - 1) / 50 + 1);
-        }
-    }
-
-    if (pages.isEmpty())
-    {
-        return;
-    }
-
-    QList<int> sortedPages = pages.values();
-    std::sort(sortedPages.begin(), sortedPages.end());
     qint64 now = QDateTime::currentMSecsSinceEpoch();
-    for (int page : sortedPages)
+
+    // Collect currently visible pages and remember them
+    bool onLbTab = (ui->mTabs->currentWidget() == ui->mLbTable->parentWidget());
+    if (onLbTab && mLbRealRowCount > 0)
+    {
+        int firstRow = ui->mLbTable->rowAt(0);
+        int lastRow = ui->mLbTable->rowAt(ui->mLbTable->viewport()->height() - 1);
+        if (firstRow < 0) firstRow = 0;
+        if (lastRow < 0 || lastRow >= mLbRealRowCount) lastRow = mLbRealRowCount - 1;
+
+        if (lastRow >= 0)
+        {
+            QSet<int> vis;
+            for (int r = firstRow; r <= lastRow; ++r)
+            {
+                QTableWidgetItem *item = ui->mLbTable->item(r, 0);
+                if (item)
+                {
+                    int rank = item->data(Qt::DisplayRole).toInt();
+                    if (rank > 0) vis.insert((rank - 1) / 50 + 1);
+                }
+            }
+            if (!vis.isEmpty())
+            {
+                mLbLastVisiblePages = vis.values().toVector();
+                std::sort(mLbLastVisiblePages.begin(), mLbLastVisiblePages.end());
+            }
+        }
+    }
+
+    // Build priority list of pages to refresh:
+    //   1. Page 1 (always — drives stats bar rank/verified)
+    //   2. User's own page (if different from 1)
+    //   3. Last-visible pages (keeps viewed data fresh even when tab is hidden)
+    QVector<int> candidates;
+    candidates.append(1);
+    if (mLbUserPage > 1)
+    {
+        candidates.append(mLbUserPage);
+    }
+    for (int p : mLbLastVisiblePages)
+    {
+        if (!candidates.contains(p))
+        {
+            candidates.append(p);
+        }
+    }
+
+    // Fetch the most stale page
+    for (int page : candidates)
     {
         qint64 elapsed = now - mLbPageFetchTimes.value(page, 0);
         if (elapsed >= 15000)
