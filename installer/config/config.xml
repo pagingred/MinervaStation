@@ -23,7 +23,7 @@
 
     <InstallActionColumnVisible>true</InstallActionColumnVisible>
 
-    <WizardStyle>Modern</WizardStyle>
+    <WizardStyle>Classic</WizardStyle>
     <WizardDefaultWidth>800</WizardDefaultWidth>
     <WizardDefaultHeight>600</WizardDefaultHeight>
 
@@ -31,4 +31,5 @@
     <InstallerApplicationIcon>icon</InstallerApplicationIcon>
     <Logo>logo.png</Logo>
     <Banner>banner.png</Banner>
+    <TitleColor>#C4B5FD</TitleColor>
 </Installer>
