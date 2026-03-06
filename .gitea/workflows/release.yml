@@ -103,7 +103,10 @@ jobs:
 
           REM Clean build artifacts before packaging
           cd build\release
-          del /q *.obj *.cpp *.h *.res moc_* qrc_* ui_* .qmake.stash Makefile* 2>nul
+          del /q *.obj *.o *.cpp *.h *.res *.pdb *.ilk *.exp *.lib *.log *.manifest 2>nul
+          del /q moc_* qrc_* ui_* .qmake.stash Makefile* qmake_qmake_qm_files.qrc 2>nul
+          del /q vc*.pdb 2>nul
+          for /d %%d in (.moc .obj .rcc .uic debug) do if exist "%%d" rmdir /s /q "%%d"
           cd ..\..
 
           if exist "%APP_DATA%" rmdir /s /q "%APP_DATA%"
@@ -265,6 +268,12 @@ jobs:
       - name: Package for Installer
         shell: bash
         run: |
+          # Clean build artifacts from build dir
+          cd build
+          rm -f *.o *.cpp *.h moc_* qrc_* ui_* .qmake.stash Makefile qmake_qmake_qm_files.qrc 2>/dev/null || true
+          rm -rf .moc .obj .rcc .uic 2>/dev/null || true
+          cd ..
+
           APP_DATA="installer/packages/com.redline.minervastation.app/data"
 
           rm -rf "$APP_DATA"
@@ -401,6 +410,12 @@ jobs:
           for QT_PATH in ~/Qt/6.11.0/gcc_64 /opt/Qt/6.11.0/gcc_64; do
             [ -d "$QT_PATH/lib" ] && break
           done
+
+          # Clean build artifacts
+          cd build
+          rm -f *.o *.cpp *.h moc_* qrc_* ui_* .qmake.stash Makefile qmake_qmake_qm_files.qrc 2>/dev/null || true
+          rm -rf .moc .obj .rcc .uic 2>/dev/null || true
+          cd ..
 
           APP_DATA="installer/packages/com.redline.minervastation.app/data"
 
