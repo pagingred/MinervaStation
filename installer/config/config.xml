@@ -23,7 +23,8 @@
 
     <InstallActionColumnVisible>true</InstallActionColumnVisible>
 
-    <WizardStyle>Classic</WizardStyle>
+    <WizardStyle>Modern</WizardStyle>
+    <WizardShowPageList>false</WizardShowPageList>
     <WizardDefaultWidth>800</WizardDefaultWidth>
     <WizardDefaultHeight>600</WizardDefaultHeight>
 
@@ -32,4 +33,5 @@
     <Logo>logo.png</Logo>
     <Banner>banner.png</Banner>
     <TitleColor>#C4B5FD</TitleColor>
+    <ControlScript>controller.qs</ControlScript>
 </Installer>
