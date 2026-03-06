@@ -3,17 +3,16 @@
 
 #include <QObject>
 #include <QNetworkAccessManager>
-#include <QQueue>
-#include <QSet>
 #include <QJsonArray>
-#include <QTcpServer>
-#include <QDateTime>
+#include <QMap>
+#include <QSet>
+#include <QWebSocket>
 
-#include "filemanifest.h"
 #include "minervaconfig.h"
 #include "jobstate.h"
-#include "uploadretryentry.h"
-#include "uploadqueueentry.h"
+#include "hyperscrapeprotocol.h"
+
+class QTimer;
 
 class MinervaWorker : public QObject
 {
@@ -24,23 +23,24 @@ public:
     ~MinervaWorker() override;
 
     bool IsRunning() const;
+    bool IsConnected() const;
+    void EstablishConnection(const MinervaConfig &aCfg);
+    void CloseConnection();
     void Start(const MinervaConfig &aCfg);
     void Stop();
     void UpdateConfig(const MinervaConfig &aCfg);
 
-    void ForceRetryUpload(int aFileId);
-
     void DoLogin(const QString &aServerUrl);
+    void SubmitToken(const QString &aToken);
     void CheckVersion(const QString &aServerUrl);
     void FetchLeaderboard(const QString &aServerUrl,
                           const QString &aToken,
                           int aPage = 1);
+    void FetchStats(const QString &aApiBase);
 
     static QString TokenPathLocal();
     static QString LoadToken();
     static void SaveToken(const QString &aToken);
-
-    static QString PrettyPath(const QString &aRawPath);
 
     const MinervaConfig &Config() const;
 
@@ -49,88 +49,62 @@ signals:
     void Started();
     void Stopped();
     void ConfigChanged();
-    void JobUpdated(int aFileId,
+    void JobUpdated(int aJobIndex,
                     const JobState &aState);
-    void JobRemoved(int aFileId);
+    void JobRemoved(int aJobIndex);
     void StatsChanged(int aOk,
                       int aFailed,
                       qint64 aBytesUp,
                       qint64 aBytesDown);
     void LoginResult(bool aOk,
                      const QString &aDetail);
+    void LoginPrompt();
     void VersionResult(const QString &aRemote);
     void LeaderboardResult(const QJsonArray &aRows,
                            int aPage);
+    void NetworkStatsResult(const QJsonObject &aStats);
 
 private:
-    void FetchJobs();
-    void TryDispatchDownloads();
-    void TryDispatchUploads();
-    void ProcessJob(const JobInfo &aJob);
-    void DoDownload(const JobInfo &aJob,
-                    const QString &aLocalPath,
-                    int aAttempt);
-    void EnqueueUpload(const JobInfo &aJob,
-                       const QString &aLocalPath,
-                       qint64 aFileSize,
-                       int aUploadRetryCount = 0);
-    void DoUpload(const JobInfo &aJob,
-                  const QString &aLocalPath,
-                  qint64 aFileSize,
-                  int aUploadRetryCount = 0);
-    void DoReport(int aFileId,
-                  const QString &aStatus,
-                  qint64 aBytesDownloaded,
-                  const QString &aError,
-                  const QString &aLocalPath,
-                  bool aKeepFile);
-    void ReportWithRetry(int aFileId,
-                         const QString &aStatus,
-                         qint64 aBytes,
-                         const QString &aError,
-                         int aAttempt,
-                         int aMaxAttempts,
-                         std::function<void(bool)> aDone);
-
-    void ScheduleUploadRetry(const JobInfo &aJob,
-                             const QString &aLocalPath,
-                             qint64 aFileSize,
-                             int aRetryCount,
-                             const QString &aError);
-    void ExecuteUploadRetry(int aFileId);
-    void ProbeFileNeeded(const FileEntry &aEntry);
-    void MoveToDownloadsDir(const QString &aLocalPath);
-    void RecoverFromManifest();
-    void CleanOrphanFiles();
-
-    QNetworkRequest AuthRequest(const QUrl &aUrl) const;
-    QString LocalPathForJob(const QString &aUrl,
-                            const QString &aDestPath) const;
-    static QString SanitizeComponent(const QString &aPart);
-    static QString LabelForPath(const QString &aPath);
+    void ConnectWebSocket();
+    void OnConnected();
+    void OnDisconnected();
+    void OnBinaryMessage(const QByteArray &aMsg);
+    void OnError(QAbstractSocket::SocketError aError);
+    void HandleRegisterResponse(const QByteArray &aMsg);
+    void HandleChunkResponse(const QByteArray &aMsg);
+    void HandleOk(const QByteArray &aMsg);
+    void HandleError(const QByteArray &aMsg);
+    void ScheduleRequestChunks();
+    void RequestChunks();
+    void StreamChunk(const HyperscrapeProtocol::ChunkAssignment &aChunk, int aJobIndex);
+    void RetryChunk(int aJobIndex);
+    void FailChunk(int aJobIndex, const QString &aChunkId, const QString &aError, bool aDetach);
+    void SendSubchunk(int aJobIndex, const QString &aChunkId,
+                      const QString &aFileId, const QByteArray &aData);
 
     MinervaConfig mCfg;
+    QWebSocket *mSocket = nullptr;
     QNetworkAccessManager *mNam = nullptr;
-    QTimer *mFetchTimer = nullptr;
+    QTimer *mReconnectTimer = nullptr;
+    QTimer *mRequestChunksTimer = nullptr;
     bool mRunning = false;
-    QString mRemoteVersion = "1.0.0";
-    QQueue<JobInfo> mQueue;
-    QSet<int> mSeenIds;
-    bool mNoJobsWarned = false;
-    int mDownloadSlots = 0;
-    qint64 mInFlightDownloadBytes = 0;
-    QQueue<UploadQueueEntry> mUploadQueue;
-    int mUploadSlots = 0;
+    bool mRegistered = false;
+    int mActiveStreams = 0;
+    int mNextJobIndex = 0;
+    QMap<int, JobState> mJobs;
+    QMap<QString, int> mChunkToJob;
+    QMap<int, HyperscrapeProtocol::ChunkAssignment> mChunkAssignments;
+    QMap<int, QByteArray> mChunkBuffers;
+    QMap<int, qint64> mChunkBytesReceived;
+    QMap<int, bool> mChunkWaitingOk;
+    QMap<int, QByteArray> mChunkPendingSubchunk;
+    QMap<int, bool> mChunkHttpDone;
+    QMap<int, QNetworkReply*> mChunkReplies;
+    QSet<QString> mSeenChunkIds;
     int mOkCount = 0;
     int mFailCount = 0;
     qint64 mBytesUp = 0;
     qint64 mBytesDown = 0;
-    QVector<QNetworkAccessManager*> mUploadNamPool;
-    int mUploadNamIndex = 0;
-    void EnsureUploadNamPool();
-    QMap<int, UploadRetryEntry> mUploadRetryQueue;
-    FileManifest mManifest;
-    QTcpServer *mLoginServer = nullptr;
 };
 
 #endif

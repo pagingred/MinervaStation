@@ -6,18 +6,12 @@
 
 #include <QThread>
 #include <QSysInfo>
-#include <QStorageInfo>
-#include <QProcess>
-#include <QJsonDocument>
-#include <QJsonArray>
-#include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QElapsedTimer>
 #include <QRandomGenerator>
 #include <algorithm>
-#include <functional>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -34,7 +28,7 @@ SystemProfiler::SystemProfiler(QObject *aParent)
 
 }
 
-SystemInfo SystemProfiler::DetectSystemInfo(const QString &aTempDirPath)
+SystemInfo SystemProfiler::DetectSystemInfo(const QString &)
 {
     SystemInfo info;
 
@@ -75,139 +69,6 @@ SystemInfo SystemProfiler::DetectSystemInfo(const QString &aTempDirPath)
         {
             info.totalRamBytes = static_cast<qint64>(si.totalram) * si.mem_unit;
             info.availRamBytes = static_cast<qint64>(si.freeram + si.bufferram) * si.mem_unit;
-        }
-    }
-#endif
-
-    QString diskPath = aTempDirPath;
-    if (aTempDirPath.isEmpty())
-    {
-        diskPath = ".";
-    }
-
-    QStorageInfo si(diskPath);
-    if (si.isValid())
-    {
-        info.diskTotalBytes = si.bytesTotal();
-        info.diskFreeBytes = si.bytesAvailable();
-    }
-
-    info.diskType = "Unknown";
-#ifdef Q_OS_WIN
-    {
-        QProcess ps;
-        ps.setProgram("powershell");
-        ps.setArguments({"-NoProfile", "-Command",
-            "Get-PhysicalDisk | Select MediaType,BusType | ConvertTo-Json"});
-        ps.start();
-        if (ps.waitForFinished(5000))
-        {
-            QByteArray out = ps.readAllStandardOutput();
-            QJsonDocument doc = QJsonDocument::fromJson(out);
-
-            std::function<QString(const QJsonObject &)> classify = [](const QJsonObject &aObj) -> QString
-            {
-                QString bus = aObj.value("BusType").toString();
-                QString media = aObj.value("MediaType").toString();
-                if (bus.contains("NVMe", Qt::CaseInsensitive))
-                {
-                    return "NVMe";
-                }
-                if (media.contains("SSD", Qt::CaseInsensitive))
-                {
-                    return "SSD";
-                }
-                if (media.contains("HDD", Qt::CaseInsensitive))
-                {
-                    return "HDD";
-                }
-                return "Unknown";
-            };
-
-            if (doc.isArray())
-            {
-                QJsonArray arr = doc.array();
-                for (const QJsonValue &v : arr)
-                {
-                    QString t = classify(v.toObject());
-                    if (t == "NVMe")
-                    {
-                        info.diskType = t;
-                        break;
-                    }
-                    if (t == "SSD" && info.diskType != "NVMe")
-                    {
-                        info.diskType = t;
-                    }
-                    if (t == "HDD" && info.diskType == "Unknown")
-                    {
-                        info.diskType = t;
-                    }
-                }
-            }
-            else if (doc.isObject())
-            {
-                info.diskType = classify(doc.object());
-            }
-        }
-    }
-#elif defined(Q_OS_MACOS)
-    {
-        QProcess ps;
-        ps.setProgram("diskutil");
-        ps.setArguments({"info", "/"});
-        ps.start();
-        if (ps.waitForFinished(5000))
-        {
-            QString out = QString::fromUtf8(ps.readAllStandardOutput());
-            if (out.contains("NVMe", Qt::CaseInsensitive))
-            {
-                info.diskType = "NVMe";
-            }
-            else if (out.contains("Solid State: Yes", Qt::CaseInsensitive) ||
-                     out.contains("SSD", Qt::CaseInsensitive))
-            {
-                info.diskType = "SSD";
-            }
-            else if (out.contains("Solid State: No", Qt::CaseInsensitive))
-            {
-                info.diskType = "HDD";
-            }
-        }
-    }
-#elif defined(Q_OS_LINUX)
-    {
-        QStorageInfo sti(diskPath);
-        QString dev = QString::fromUtf8(sti.device());
-        QString devName = dev.section('/', -1);
-        QString baseDev = devName;
-        if (baseDev.startsWith("nvme"))
-        {
-            int pIdx = baseDev.lastIndexOf('p');
-            if (pIdx > 4)
-            {
-                baseDev = baseDev.left(pIdx);
-            }
-        }
-        else
-        {
-            while (!baseDev.isEmpty() && baseDev.back().isDigit())
-            {
-                baseDev.chop(1);
-            }
-        }
-        if (baseDev.startsWith("nvme"))
-        {
-            info.diskType = "NVMe";
-        }
-        else
-        {
-            QFile rotFile(QString("/sys/block/%1/queue/rotational").arg(baseDev));
-            if (rotFile.open(QIODevice::ReadOnly))
-            {
-                QString val = QString::fromUtf8(rotFile.readAll()).trimmed();
-                info.diskType = (val == "0") ? "SSD" : "HDD";
-            }
         }
     }
 #endif
@@ -405,34 +266,6 @@ RecommendedSettings SystemProfiler::Calculate(const SystemInfo &aSys, const Spee
         concurrency = std::min(concurrency, std::max(1, ramCap));
     }
     r.concurrency = std::clamp(concurrency, 1, 1000);
-
-    r.batchSize = std::clamp(r.concurrency * 2, 1, 1000);
-
-    if (dlMbps >= 500)
-    {
-        r.aria2cConnections = 16;
-    }
-    else if (dlMbps >= 200)
-    {
-        r.aria2cConnections = 14;
-    }
-    else if (dlMbps >= 100)
-    {
-        r.aria2cConnections = 12;
-    }
-    else if (dlMbps >= 50)
-    {
-        r.aria2cConnections = 8;
-    }
-    else if (dlMbps >= 25)
-    {
-        r.aria2cConnections = 6;
-    }
-    else
-    {
-        r.aria2cConnections = 4;
-    }
-    r.aria2cConnections = std::clamp(r.aria2cConnections, 1, 16);
 
     return r;
 }

@@ -1,12 +1,11 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "downloadmanager.h"
+#include "hyperscrapeprotocol.h"
 #include "leaderboardheat.h"
 #include "phasecolors.h"
 #include "systemprofile.h"
 
 #include <QApplication>
-#include <QCheckBox>
 #include <QCloseEvent>
 #include <QDialog>
 #include <QResizeEvent>
@@ -14,7 +13,6 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
-#include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -24,6 +22,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QNetworkAccessManager>
@@ -34,7 +33,6 @@
 #include <QScrollBar>
 #include <QSettings>
 #include <QSpinBox>
-#include <QStorageInfo>
 #include <QTabWidget>
 #include <QSplitter>
 #include <QStatusBar>
@@ -58,6 +56,23 @@ static QString fmtBytes(qint64 aBytes)
     return QLocale().formattedDataSize(aBytes, 1, QLocale::DataSizeSIFormat);
 }
 
+static QString fmtSpeed(double bps)
+{
+    if (bps < 1024)
+    {
+        return QString::number(static_cast<int>(bps)) + " B/s";
+    }
+    if (bps < 1024 * 1024)
+    {
+        return QString::number(bps / 1024, 'f', 1) + " KB/s";
+    }
+    if (bps < 1024LL * 1024 * 1024)
+    {
+        return QString::number(bps / (1024 * 1024), 'f', 2) + " MB/s";
+    }
+    return QString::number(bps / (1024LL * 1024 * 1024), 'f', 2) + " GB/s";
+}
+
 MainWindow::~MainWindow()
 {
     mWorker->Stop();
@@ -79,8 +94,6 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
     connect(ui->mPauseBtn, &QPushButton::clicked, this, &MainWindow::OnPause);
     connect(ui->mStopBtn, &QPushButton::clicked, this, &MainWindow::OnStop);
     connect(ui->mRecommendBtn, &QPushButton::clicked, this, &MainWindow::OnRecommendedSettings);
-    connect(ui->browseTempBtn, &QPushButton::clicked, this, &MainWindow::OnBrowseTempDir);
-    connect(ui->browseDlBtn, &QPushButton::clicked, this, &MainWindow::OnBrowseDownloadsDir);
     connect(ui->mCheckServersBtn, &QPushButton::clicked, this, &MainWindow::OnCheckServers);
 
     ui->mLogoutBtn->hide();
@@ -89,24 +102,29 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
     ui->mStopBtn->hide();
     ui->mVersionLabel->setText(QString("Version: %1").arg(APP_VERSION));
 
-    ui->mTempDir->setPlaceholderText("Default: " + QCoreApplication::applicationDirPath() + "/temp");
-    ui->mDownloadsDir->setPlaceholderText("Default: " + QCoreApplication::applicationDirPath() + "/downloads");
-
-    ui->mAria2cLabel->setText(DownloadManager::HasAria2c()
-                                  ? "aria2c: found" : "aria2c: NOT found (using Qt HTTP for all downloads)");
-    ui->mAria2cLabel->setStyleSheet(DownloadManager::HasAria2c() ? "color: green;" : "color: orange;");
-
     QString notChecked = QStringLiteral("<span style='color:#888;'>\u25CF</span> Not checked");
-    ui->mStatusApiVersion->setText(notChecked);
-    ui->mStatusApiJobs->setText(notChecked);
-    ui->mStatusApiReport->setText(notChecked);
     ui->mStatusApiLeaderboard->setText(notChecked);
-    ui->mStatusGateUpload->setText(notChecked);
+    ui->mStatusApiStats->setText(notChecked);
 
     ui->mLbRefreshLabel->installEventFilter(this);
 
     LoadSettings();
     RefreshLoginLabel();
+
+    {
+        QString token = MinervaWorker::LoadToken();
+        if (!token.isEmpty())
+        {
+            MinervaConfig cfg;
+            cfg.firehoseUrl = ui->mFirehoseUrl->text();
+            cfg.serverUrl = ui->mServerUrl->text();
+            cfg.token = token;
+            cfg.concurrency = ui->mConcurrency->value();
+            cfg.subchunkRetries = ui->mSubchunkRetries->value();
+            cfg.reconnectDelaySec = ui->mReconnectDelay->value();
+            mWorker->EstablishConnection(cfg);
+        }
+    }
 
     connect(mWorker, &MinervaWorker::Log, this, [this](const QString &aMsg)
             {
@@ -130,64 +148,34 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
     mLogFlushTimer->setSingleShot(true);
     connect(mLogFlushTimer, &QTimer::timeout, this, &MainWindow::FlushLogMessages);
 
-    connect(mWorker, &MinervaWorker::JobUpdated, this, [this](int aFileId, const JobState &aState)
+    connect(mWorker, &MinervaWorker::JobUpdated, this, [this](int aJobIndex, const JobState &aState)
             {
-                if (aState.phase == JobPhase::Downloading)
+                if (aState.phase == JobPhase::Downloading || aState.phase == JobPhase::Uploading)
                 {
-                    mLiveDownloadProgress[aFileId] = aState.progress;
+                    mLiveProgress[aJobIndex] = aState.progress;
                 }
-                else if (aState.phase == JobPhase::Uploading)
-                {
-                    mLiveUploadProgress[aFileId] = aState.progress;
-                }
-                bool isUploadPhase = (aState.phase == JobPhase::QueuedUpload ||
-                                      aState.phase == JobPhase::Uploading ||
-                                      aState.phase == JobPhase::UploadRetryWait ||
-                                      aState.phase == JobPhase::Reporting);
                 if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
                 {
-                    mLiveDownloadProgress.remove(aFileId);
-                    mLiveUploadProgress.remove(aFileId);
-                }
-                if (isUploadPhase)
-                {
-                    mLiveDownloadProgress.remove(aFileId);
+                    mLiveProgress.remove(aJobIndex);
                 }
 
-                mPendingJobStates[aFileId] = aState;
+                mPendingJobStates[aJobIndex] = aState;
                 if (!mFlushTimer->isActive())
                 {
                     mFlushTimer->start(mUiUpdateIntervalMs);
                 }
             });
 
-    connect(mWorker, &MinervaWorker::JobRemoved, this, [this](int aFileId)
+    connect(mWorker, &MinervaWorker::JobRemoved, this, [this](int aJobIndex)
             {
-                if (mUploadRowIndex.contains(aFileId))
+                if (mChunkRowIndex.contains(aJobIndex))
                 {
-                    ui->mUploadTable->removeRow(mUploadRowIndex.value(aFileId)->row());
-                    mUploadRowIndex.remove(aFileId);
+                    ui->mChunksTable->removeRow(mChunkRowIndex.value(aJobIndex)->row());
+                    mChunkRowIndex.remove(aJobIndex);
                 }
-                else if (mDownloadRowIndex.contains(aFileId))
-                {
-                    ui->mDownloadTable->removeRow(mDownloadRowIndex.value(aFileId)->row());
-                    mDownloadRowIndex.remove(aFileId);
-                }
-                else
-                {
-                    if (mQueuedUploadCount > 0)
-                    {
-                        --mQueuedUploadCount;
-                    }
-                    else if (mQueuedDownloadCount > 0)
-                    {
-                        --mQueuedDownloadCount;
-                    }
-                }
-                mProgressBars.remove(aFileId);
-                mLastUiUpdate.remove(aFileId);
-                mLiveDownloadProgress.remove(aFileId);
-                mLiveUploadProgress.remove(aFileId);
+                mProgressBars.remove(aJobIndex);
+                mLastUiUpdate.remove(aJobIndex);
+                mLiveProgress.remove(aJobIndex);
             });
 
     connect(mWorker, &MinervaWorker::StatsChanged, this,
@@ -205,10 +193,35 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
                 {
                     AppendLog("Login successful!");
                     RefreshLoginLabel();
+                    MinervaConfig cfg;
+                    cfg.firehoseUrl = ui->mFirehoseUrl->text();
+                    cfg.serverUrl = ui->mServerUrl->text();
+                    cfg.token = MinervaWorker::LoadToken();
+                    cfg.concurrency = ui->mConcurrency->value();
+                    cfg.subchunkRetries = ui->mSubchunkRetries->value();
+                    cfg.reconnectDelaySec = ui->mReconnectDelay->value();
+                    mWorker->EstablishConnection(cfg);
                 }
                 else
                 {
                     AppendLog("Login failed: " + detail);
+                }
+            });
+
+    connect(mWorker, &MinervaWorker::LoginPrompt, this, [this]()
+            {
+                bool ok = false;
+                QString token = QInputDialog::getText(
+                    this, "Paste Token",
+                    "Paste the token shown in your browser:",
+                    QLineEdit::Normal, {}, &ok);
+                if (ok && !token.trimmed().isEmpty())
+                {
+                    mWorker->SubmitToken(token.trimmed());
+                }
+                else
+                {
+                    AppendLog("Login cancelled.");
                 }
             });
 
@@ -219,38 +232,14 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
             return;
         }
         MinervaConfig cfg = mWorker->Config();
-        cfg.dlConcurrency = ui->mDlConcurrency->value();
-        cfg.ulConcurrency = ui->mUlConcurrency->value();
-        cfg.batchSize = ui->mBatchSize->value();
-        cfg.aria2cConnections = ui->mAria2cConns->value();
-        cfg.downloadRetryDelaySec = ui->mDownloadRetryDelay->value();
-        cfg.uploadRetryDelaySec = ui->mUploadRetryDelay->value();
-        cfg.diskReserveBytes = static_cast<qint64>(ui->mDiskReserveGb->value()) * 1024LL * 1024 * 1024;
-        cfg.reportRetries = ui->mReportRetries->value();
-        cfg.queuePrefetch = ui->mQueuePrefetch->value();
-        cfg.uploadChunkSize = static_cast<qint64>(ui->mUploadChunkSizeMb->value()) * 1024 * 1024;
-        cfg.uploadStartRetries = ui->mUploadStartRetries->value();
-        cfg.uploadChunkRetries = ui->mUploadChunkRetries->value();
-        cfg.uploadFinishRetries = ui->mUploadFinishRetries->value();
-        cfg.uploadRetryCap = static_cast<float>(ui->mUploadRetryCap->value());
-        cfg.uploadChunkRetryCap = static_cast<float>(ui->mUploadChunkRetryCap->value());
+        cfg.concurrency = ui->mConcurrency->value();
+        cfg.subchunkRetries = ui->mSubchunkRetries->value();
+        cfg.reconnectDelaySec = ui->mReconnectDelay->value();
         mWorker->UpdateConfig(cfg);
     };
-    connect(ui->mDlConcurrency, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUlConcurrency, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mBatchSize,     QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mAria2cConns,   QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mDownloadRetryDelay, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadRetryDelay, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mDiskReserveGb, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mReportRetries, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mQueuePrefetch, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadChunkSizeMb, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadStartRetries, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadChunkRetries, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadFinishRetries, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadRetryCap, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, pushLiveConfig);
-    connect(ui->mUploadChunkRetryCap, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, pushLiveConfig);
+    connect(ui->mConcurrency, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
+    connect(ui->mSubchunkRetries, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
+    connect(ui->mReconnectDelay, QOverload<int>::of(&QSpinBox::valueChanged), this, pushLiveConfig);
     connect(ui->mUiUpdateInterval, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int aVal)
             {
                 mUiUpdateIntervalMs = aVal;
@@ -265,6 +254,30 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
                     ui->mLbRefreshLabel->setEnabled(true);
                 }
                 LbAppendPageData(aRows, aPage);
+            });
+
+    connect(mWorker, &MinervaWorker::NetworkStatsResult, this, [this](const QJsonObject &stats)
+            {
+                ui->mNetWorkersLabel->setText(QString::number(stats["active_workers"].toInt()));
+                ui->mNetSpeedLabel->setText(fmtSpeed(stats["current_speed"].toDouble()));
+
+                int completedFiles = stats["completed_files"].toInt();
+                int totalFiles = stats["total_files"].toInt();
+                ui->mNetFilesLabel->setText(QString("%1 / %2")
+                    .arg(QLocale().toString(completedFiles), QLocale().toString(totalFiles)));
+
+                int completedChunks = stats["completed_chunks"].toInt();
+                int totalChunks = stats["total_chunks"].toInt();
+                ui->mNetChunksLabel->setText(QString("%1 / %2")
+                    .arg(QLocale().toString(completedChunks), QLocale().toString(totalChunks)));
+
+                qint64 dlBytes = stats["downloaded_bytes"].toInteger();
+                qint64 totalBytes = stats["total_bytes"].toInteger();
+                ui->mNetDownloadedLabel->setText(QString("%1 / %2")
+                    .arg(fmtBytes(dlBytes), fmtBytes(totalBytes)));
+
+                int pending = stats["pending"].toInt();
+                ui->mNetPendingLabel->setText(QLocale().toString(pending));
             });
 
     connect(ui->mLbTable->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]()
@@ -306,11 +319,6 @@ MainWindow::MainWindow(QWidget *aParent) : QMainWindow(aParent)
     mUptimeTimer = new QTimer(this);
     connect(mUptimeTimer, &QTimer::timeout, this, &MainWindow::UpdateUptime);
 
-    mDiskTimer = new QTimer(this);
-    connect(mDiskTimer, &QTimer::timeout, this, &MainWindow::UpdateDiskUsage);
-    mDiskTimer->start(5000);
-    UpdateDiskUsage();
-
     mLbTimer = new QTimer(this);
     connect(mLbTimer, &QTimer::timeout, this, &MainWindow::LbRefreshVisible);
     mLbTimer->start(15000);
@@ -345,133 +353,29 @@ void MainWindow::FlushJobUpdates()
     QHash<int, JobState> batch;
     batch.swap(mPendingJobStates);
 
-    QScrollBar *ulScroll = ui->mUploadTable->verticalScrollBar();
-    QScrollBar *dlScroll = ui->mDownloadTable->verticalScrollBar();
-    bool ulWasAtTop = (ulScroll->value() <= ulScroll->singleStep());
-    bool dlWasAtTop = (dlScroll->value() <= dlScroll->singleStep());
+    QScrollBar *scroll = ui->mChunksTable->verticalScrollBar();
+    bool wasAtTop = (scroll->value() <= scroll->singleStep());
 
-    ui->mUploadTable->setUpdatesEnabled(false);
-    ui->mDownloadTable->setUpdatesEnabled(false);
+    ui->mChunksTable->setUpdatesEnabled(false);
 
     for (QHash<int, JobState>::const_iterator it = batch.constBegin(); it != batch.constEnd(); ++it)
     {
-        int aFileId = it.key();
+        int jobIdx = it.key();
         const JobState &aState = it.value();
 
-        if (aState.phase == JobPhase::QueuedUpload)
+        if (aState.phase == JobPhase::Queued && !mChunkRowIndex.contains(jobIdx))
         {
-            if (!mUploadRowIndex.contains(aFileId))
-            {
-                ++mQueuedUploadCount;
-            }
-            continue;
-        }
-        if (aState.phase == JobPhase::Queued)
-        {
-            if (!mDownloadRowIndex.contains(aFileId))
-            {
-                ++mQueuedDownloadCount;
-            }
             continue;
         }
 
-        if (!mUploadRowIndex.contains(aFileId) && !mDownloadRowIndex.contains(aFileId))
+        if (!mChunkRowIndex.contains(jobIdx))
         {
-            if (aState.phase == JobPhase::Uploading ||
-                aState.phase == JobPhase::UploadRetryWait ||
-                aState.phase == JobPhase::Reporting)
-            {
-                if (mQueuedUploadCount > 0)
-                {
-                    --mQueuedUploadCount;
-                }
-            }
-            else if (aState.phase == JobPhase::Downloading)
-            {
-                if (mQueuedDownloadCount > 0)
-                {
-                    --mQueuedDownloadCount;
-                }
-            }
-            else if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
-            {
-                if (mQueuedUploadCount > 0)
-                {
-                    --mQueuedUploadCount;
-                }
-                else if (mQueuedDownloadCount > 0)
-                {
-                    --mQueuedDownloadCount;
-                }
-            }
-        }
-
-        bool isUploadPhase = (aState.phase == JobPhase::Uploading ||
-                              aState.phase == JobPhase::UploadRetryWait ||
-                              aState.phase == JobPhase::Reporting);
-
-        QTableWidget *targetTable = isUploadPhase ? ui->mUploadTable : ui->mDownloadTable;
-        QHash<int, QTableWidgetItem*> *targetIndex = isUploadPhase ? &mUploadRowIndex : &mDownloadRowIndex;
-        QTableWidget *otherTable = isUploadPhase ? ui->mDownloadTable : ui->mUploadTable;
-        QHash<int, QTableWidgetItem*> *otherIndex = isUploadPhase ? &mDownloadRowIndex : &mUploadRowIndex;
-
-        if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
-        {
-            if (mUploadRowIndex.contains(aFileId))
-            {
-                targetTable = ui->mUploadTable;
-                targetIndex = &mUploadRowIndex;
-                otherTable = ui->mDownloadTable;
-                otherIndex = &mDownloadRowIndex;
-            }
-        }
-
-        if (otherIndex->contains(aFileId))
-        {
-            int otherRow = otherIndex->value(aFileId)->row();
-            mProgressBars.remove(aFileId);
-            otherTable->removeRow(otherRow);
-            otherIndex->remove(aFileId);
-        }
-
-        int row = -1;
-        if (targetIndex->contains(aFileId))
-        {
-            row = targetIndex->value(aFileId)->row();
-        }
-
-        int newKey = PhaseColors::SortKey(aState.phase, aState.progress, aState.total);
-        if (row >= 0)
-        {
-            QTableWidgetItem *phaseItem = targetTable->item(row, 1);
-            int oldKey = phaseItem ? phaseItem->data(Qt::UserRole).toInt() : -1;
-            if (oldKey != newKey)
-            {
-                mProgressBars.remove(aFileId);
-                targetIndex->remove(aFileId);
-                targetTable->removeRow(row);
-                row = -1;
-            }
-        }
-
-        bool isNewRow = (row < 0);
-        if (isNewRow)
-        {
-            row = targetTable->rowCount();
-            for (int r = 0; r < targetTable->rowCount(); ++r)
-            {
-                QTableWidgetItem *pi = targetTable->item(r, 1);
-                if (pi && pi->data(Qt::UserRole).toInt() > newKey)
-                {
-                    row = r;
-                    break;
-                }
-            }
-            targetTable->insertRow(row);
-            QTableWidgetItem *idItem = new QTableWidgetItem(QString::number(aFileId));
-            idItem->setData(Qt::UserRole, aFileId);
-            targetTable->setItem(row, 0, idItem);
-            targetIndex->insert(aFileId, idItem);
+            int row = ui->mChunksTable->rowCount();
+            ui->mChunksTable->insertRow(row);
+            QTableWidgetItem *idItem = new QTableWidgetItem(aState.info.chunkId.left(8));
+            idItem->setData(Qt::UserRole, jobIdx);
+            ui->mChunksTable->setItem(row, 0, idItem);
+            mChunkRowIndex.insert(jobIdx, idItem);
 
             QProgressBar *bar = new QProgressBar;
             bar->setMinimum(0);
@@ -480,76 +384,64 @@ void MainWindow::FlushJobUpdates()
             bar->setTextVisible(true);
             bar->setStyleSheet(PhaseColors::BarStyle(aState.phase));
             bar->setProperty("_phase", static_cast<int>(aState.phase));
-            targetTable->setCellWidget(row, 3, bar);
-            mProgressBars.insert(aFileId, bar);
+            ui->mChunksTable->setCellWidget(row, 3, bar);
+            mProgressBars.insert(jobIdx, bar);
         }
+
+        int row = mChunkRowIndex.value(jobIdx)->row();
 
         QString phaseStr;
         switch (aState.phase)
         {
-        case JobPhase::Queued:          phaseStr = "Queued"; break;
-        case JobPhase::Downloading:     phaseStr = "Downloading"; break;
-        case JobPhase::QueuedUpload:    phaseStr = "Queued"; break;
-        case JobPhase::Uploading:       phaseStr = "Uploading"; break;
-        case JobPhase::UploadRetryWait: phaseStr = "Retry Wait"; break;
-        case JobPhase::Reporting:       phaseStr = "Reporting"; break;
-        case JobPhase::Done:            phaseStr = "Done"; break;
-        case JobPhase::Failed:          phaseStr = "Failed"; break;
+        case JobPhase::Queued:      phaseStr = "Queued"; break;
+        case JobPhase::Downloading: phaseStr = "Downloading"; break;
+        case JobPhase::Uploading:   phaseStr = "Uploading"; break;
+        case JobPhase::Done:        phaseStr = "Done"; break;
+        case JobPhase::Failed:      phaseStr = "Failed"; break;
         }
         if (aState.attempt > 1)
         {
             phaseStr += QString(" (%1)").arg(aState.attempt);
         }
 
+        QString statusText;
+        if (aState.phase == JobPhase::Failed || !aState.error.isEmpty())
         {
-            QString statusText;
-            if (aState.phase == JobPhase::Failed || aState.phase == JobPhase::UploadRetryWait || !aState.error.isEmpty())
-            {
-                statusText = aState.error;
-            }
+            statusText = aState.error;
+        }
 
-            std::function<void(int, const QString &)> setCell = [&](int col, const QString &text)
+        std::function<void(int, const QString &)> setCell = [&](int col, const QString &text)
+        {
+            if (!ui->mChunksTable->item(row, col))
             {
-                if (!targetTable->item(row, col))
-                {
-                    targetTable->setItem(row, col, new QTableWidgetItem());
-                }
-                QTableWidgetItem *item = targetTable->item(row, col);
-                if (item->text() != text)
-                {
-                    item->setText(text);
-                }
-            };
-            setCell(1, phaseStr);
-            if (isNewRow)
-            {
-                setCell(2, MinervaWorker::PrettyPath(aState.info.destPath));
+                ui->mChunksTable->setItem(row, col, new QTableWidgetItem());
             }
-            setCell(4, statusText);
-
-            if (targetTable->item(row, 1))
+            QTableWidgetItem *item = ui->mChunksTable->item(row, col);
+            if (item->text() != text)
             {
-                targetTable->item(row, 1)->setData(Qt::UserRole, newKey);
+                item->setText(text);
             }
+        };
+        setCell(1, aState.info.fileId.left(12));
+        setCell(2, phaseStr);
+        setCell(4, statusText);
 
-            if (isNewRow)
+        {
+            QColor fg = PhaseColors::Color(aState.phase);
+            QColor bg = PhaseColors::Background(aState.phase);
+            for (int c = 0; c < ui->mChunksTable->columnCount(); ++c)
             {
-                QColor fg = PhaseColors::Color(aState.phase);
-                QColor bg = PhaseColors::Background(aState.phase);
-                for (int c = 0; c < targetTable->columnCount(); ++c)
+                if (ui->mChunksTable->item(row, c))
                 {
-                    if (targetTable->item(row, c))
-                    {
-                        targetTable->item(row, c)->setForeground(fg);
-                        targetTable->item(row, c)->setBackground(bg);
-                    }
+                    ui->mChunksTable->item(row, c)->setForeground(fg);
+                    ui->mChunksTable->item(row, c)->setBackground(bg);
                 }
             }
         }
 
-        if (mProgressBars.contains(aFileId))
+        if (mProgressBars.contains(jobIdx))
         {
-            QProgressBar *bar = mProgressBars[aFileId];
+            QProgressBar *bar = mProgressBars[jobIdx];
 
             int cachedPhase = bar->property("_phase").toInt();
             if (cachedPhase != static_cast<int>(aState.phase))
@@ -572,25 +464,14 @@ void MainWindow::FlushJobUpdates()
                 int pct = effectiveTotal > 0
                               ? static_cast<int>(aState.progress * 100 / effectiveTotal) : 0;
                 wantVal = std::min(pct, 100);
-                if (aState.phase == JobPhase::Uploading && pct >= 100)
-                {
-                    wantFmt = "Finalizing...";
-                }
-                else
-                {
-                    wantFmt = QString("%1 / %2  (%p%)")
-                                  .arg(fmtBytes(aState.progress))
-                                  .arg(fmtBytes(effectiveTotal));
-                }
+                wantFmt = QString("%1 / %2  (%p%)")
+                              .arg(fmtBytes(aState.progress))
+                              .arg(fmtBytes(effectiveTotal));
             }
             else if (aState.progress > 0)
             {
                 wantMax = 0;
                 wantFmt = fmtBytes(aState.progress);
-            }
-            else if (aState.phase == JobPhase::UploadRetryWait)
-            {
-                wantFmt = phaseStr;
             }
             else
             {
@@ -611,99 +492,62 @@ void MainWindow::FlushJobUpdates()
             }
         }
 
-        {
-            int cachedAction = 0;
-            QWidget *existing = targetTable->cellWidget(row, 5);
-            if (existing)
-            {
-                cachedAction = existing->property("_action").toInt();
-            }
-
-            int wantedAction = 0;
-            if (aState.phase == JobPhase::UploadRetryWait)
-            {
-                wantedAction = 1;
-            }
-            else if (aState.phase == JobPhase::Uploading ||
-                     aState.phase == JobPhase::Downloading)
-            {
-                wantedAction = 2;
-            }
-
-            if (cachedAction != wantedAction)
-            {
-                targetTable->removeCellWidget(row, 5);
-                if (wantedAction == 1)
-                {
-                    QPushButton *retryBtn = new QPushButton(QString::fromUtf8("\u21bb"));
-                    retryBtn->setFixedSize(28, 22);
-                    retryBtn->setToolTip("Retry now");
-                    retryBtn->setProperty("_action", 1);
-                    retryBtn->setStyleSheet(
-                        "QPushButton { border: 1px solid #555; border-radius: 3px; "
-                        "background: #383838; color: #f39c12; font-size: 14px; padding: 0; }"
-                        "QPushButton:hover { background: #4a4a4a; }");
-                    connect(retryBtn, &QPushButton::clicked, this, [this, aFileId]()
-                            {
-                                mWorker->ForceRetryUpload(aFileId);
-                            });
-                    targetTable->setCellWidget(row, 5, retryBtn);
-                }
-                else if (wantedAction == 2)
-                {
-                    QPushButton *cancelBtn = new QPushButton(QString::fromUtf8("\u2715"));
-                    cancelBtn->setFixedSize(28, 22);
-                    cancelBtn->setToolTip("Cancel");
-                    cancelBtn->setProperty("_action", 2);
-                    cancelBtn->setStyleSheet(
-                        "QPushButton { border: 1px solid #555; border-radius: 3px; "
-                        "background: #383838; color: #c0392b; font-size: 12px; padding: 0; }"
-                        "QPushButton:hover { background: #4a4a4a; }");
-                    targetTable->setCellWidget(row, 5, cancelBtn);
-                }
-            }
-        }
-
         if (aState.phase == JobPhase::Done || aState.phase == JobPhase::Failed)
         {
-            mPendingRemovals[aFileId] = qMakePair(QDateTime::currentMSecsSinceEpoch(), aState);
+            mPendingRemovals[jobIdx] = qMakePair(QDateTime::currentMSecsSinceEpoch(), aState);
         }
     }
 
-    ui->mUploadTable->setUpdatesEnabled(true);
-    ui->mDownloadTable->setUpdatesEnabled(true);
+    ui->mChunksTable->setUpdatesEnabled(true);
 
-    if (ulWasAtTop)
+    if (wasAtTop)
     {
-        ulScroll->setValue(0);
+        scroll->setValue(0);
     }
-    if (dlWasAtTop)
+
     {
-        dlScroll->setValue(0);
+        qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        QMap<int, QPair<qint64, JobState>>::iterator it = mPendingRemovals.begin();
+        while (it != mPendingRemovals.end())
+        {
+            if (nowMs - it.value().first < 500)
+            {
+                ++it;
+                continue;
+            }
+            int idx = it.key();
+            JobState captured = it.value().second;
+            mProgressBars.remove(idx);
+            if (mChunkRowIndex.contains(idx))
+            {
+                ui->mChunksTable->removeRow(mChunkRowIndex.value(idx)->row());
+                mChunkRowIndex.remove(idx);
+            }
+            AddFinishedRow(idx, captured);
+            it = mPendingRemovals.erase(it);
+        }
     }
+
+    int active = ui->mChunksTable->rowCount();
+    ui->mChunksLabel->setText(QString("Active Chunks (%1)").arg(active));
 }
 
 void MainWindow::SetupTables()
 {
-    std::function<void(QTableWidget *)> setupQueueTable = [](QTableWidget *table)
     {
-        table->verticalHeader()->setVisible(false);
-        QHeaderView *hdr = table->horizontalHeader();
+        ui->mChunksTable->verticalHeader()->setVisible(false);
+        QHeaderView *hdr = ui->mChunksTable->horizontalHeader();
         hdr->setStretchLastSection(false);
         hdr->setSectionResizeMode(0, QHeaderView::Fixed);
         hdr->setSectionResizeMode(1, QHeaderView::Fixed);
-        hdr->setSectionResizeMode(2, QHeaderView::Stretch);
-        hdr->setSectionResizeMode(3, QHeaderView::Fixed);
+        hdr->setSectionResizeMode(2, QHeaderView::Fixed);
+        hdr->setSectionResizeMode(3, QHeaderView::Stretch);
         hdr->setSectionResizeMode(4, QHeaderView::Fixed);
-        hdr->setSectionResizeMode(5, QHeaderView::Fixed);
-        table->setColumnWidth(0, 50);
-        table->setColumnWidth(1, 90);
-        table->setColumnWidth(3, 250);
-        table->setColumnWidth(4, 170);
-        table->setColumnWidth(5, 36);
-    };
-    setupQueueTable(ui->mUploadTable);
-    setupQueueTable(ui->mDownloadTable);
+        ui->mChunksTable->setColumnWidth(0, 80);
+        ui->mChunksTable->setColumnWidth(1, 100);
+        ui->mChunksTable->setColumnWidth(2, 80);
+        ui->mChunksTable->setColumnWidth(4, 170);
+    }
 
     {
         ui->mFinishedTable->verticalHeader()->setVisible(false);
@@ -714,7 +558,7 @@ void MainWindow::SetupTables()
         hdr->setSectionResizeMode(2, QHeaderView::ResizeToContents);
         hdr->setSectionResizeMode(3, QHeaderView::ResizeToContents);
         hdr->setSectionResizeMode(4, QHeaderView::ResizeToContents);
-        ui->mFinishedTable->setColumnWidth(0, 50);
+        ui->mFinishedTable->setColumnWidth(0, 80);
     }
 
     {
@@ -742,10 +586,10 @@ void MainWindow::LbAppendPageData(const QJsonArray &aRows, int aPage)
     {
         QJsonObject obj = aRows[i].toObject();
         LbEntry e;
-        e.rank = obj.value("rank").toInt(i + 1);
+        e.rank = obj.value("rank").toInt((aPage - 1) * 50 + i + 1);
         e.username = obj.value("discord_username").toString();
-        e.bytes = obj.value("total_bytes").toInteger(0);
-        e.files = obj.value("total_files").toInt();
+        e.bytes = obj.value("downloaded_bytes").toInteger(0);
+        e.chunks = obj.value("downloaded_chunks").toInt();
         e.avatarUrl = obj.value("avatar_url").toString();
         newEntries.append(e);
     }
@@ -833,7 +677,7 @@ void MainWindow::LbRefreshDisplay()
                   case 0: cmp = (a->rank < b->rank) ? -1 : (a->rank > b->rank ? 1 : 0); break;
                   case 2: cmp = QString::compare(a->username, b->username, Qt::CaseInsensitive); break;
                   case 3: cmp = (a->bytes < b->bytes) ? -1 : (a->bytes > b->bytes ? 1 : 0); break;
-                  case 4: cmp = (a->files < b->files) ? -1 : (a->files > b->files ? 1 : 0); break;
+                  case 4: cmp = (a->chunks < b->chunks) ? -1 : (a->chunks > b->chunks ? 1 : 0); break;
                   default: cmp = (a->rank < b->rank) ? -1 : 1; break;
                   }
                   return asc ? (cmp < 0) : (cmp > 0);
@@ -848,7 +692,7 @@ void MainWindow::LbRefreshDisplay()
         case 1: base = ""; break;
         case 2: base = "Username"; break;
         case 3: base = "Contributed"; break;
-        case 4: base = "Files"; break;
+        case 4: base = "Chunks"; break;
         }
         if (c == mLbSortCol && c != 1)
         {
@@ -878,9 +722,9 @@ void MainWindow::LbRefreshDisplay()
         ui->mLbTable->setItem(row, 2, new QTableWidgetItem(lr.username));
         ui->mLbTable->setItem(row, 3, new QTableWidgetItem(fmtBytes(lr.bytes)));
 
-        QTableWidgetItem *filesItem = new QTableWidgetItem();
-        filesItem->setData(Qt::DisplayRole, lr.files);
-        ui->mLbTable->setItem(row, 4, filesItem);
+        QTableWidgetItem *chunksItem = new QTableWidgetItem();
+        chunksItem->setData(Qt::DisplayRole, lr.chunks);
+        ui->mLbTable->setItem(row, 4, chunksItem);
 
         double t = LeaderboardHeat::BytesToT(lr.bytes);
         QColor bg = LeaderboardHeat::ColorForT(t);
@@ -1002,7 +846,8 @@ void MainWindow::LbFetchPage(int aPage)
         return;
     }
     mLbFetchingPage = true;
-    mWorker->FetchLeaderboard(ui->mServerUrl->text(), MinervaWorker::LoadToken(), aPage);
+    QString apiBase = HyperscrapeProtocol::ApiBaseFromWsUrl(ui->mFirehoseUrl->text());
+    mWorker->FetchLeaderboard(apiBase, MinervaWorker::LoadToken(), aPage);
 }
 
 void MainWindow::LbRefreshVisible()
@@ -1014,7 +859,6 @@ void MainWindow::LbRefreshVisible()
 
     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
-    // Collect currently visible pages and remember them
     bool onLbTab = (ui->mTabs->currentWidget() == ui->mLbTable->parentWidget());
     if (onLbTab && mLbRealRowCount > 0)
     {
@@ -1063,18 +907,19 @@ void MainWindow::LbRefreshVisible()
         if (elapsed >= 15000)
         {
             LbFetchPage(page);
+            FetchNetworkStats();
             return;
         }
     }
 }
 
-void MainWindow::AddFinishedRow(int aFileId, const JobState &aState)
+void MainWindow::AddFinishedRow(int aJobIndex, const JobState &aState)
 {
     ui->mFinishedTable->insertRow(0);
-    ui->mFinishedTable->setItem(0, 0, new QTableWidgetItem(QString::number(aFileId)));
-    ui->mFinishedTable->setItem(0, 1, new QTableWidgetItem(MinervaWorker::PrettyPath(aState.info.destPath)));
+    ui->mFinishedTable->setItem(0, 0, new QTableWidgetItem(aState.info.chunkId.left(8)));
+    ui->mFinishedTable->setItem(0, 1, new QTableWidgetItem(aState.info.fileId));
 
-    qint64 sizeBytes = aState.info.size > 0 ? aState.info.size : aState.total;
+    qint64 sizeBytes = aState.total;
     QString sizeStr = sizeBytes > 0 ? fmtBytes(sizeBytes) : QString();
     ui->mFinishedTable->setItem(0, 2, new QTableWidgetItem(sizeStr));
     ui->mFinishedTable->item(0, 2)->setData(Qt::UserRole, sizeBytes);
@@ -1120,39 +965,17 @@ void MainWindow::OnStart()
 
     SaveSettings();
     MinervaConfig cfg;
+    cfg.firehoseUrl = ui->mFirehoseUrl->text();
     cfg.serverUrl = ui->mServerUrl->text();
-    cfg.uploadUrl = ui->mUploadUrl->text();
     cfg.token = token;
-    cfg.dlConcurrency = ui->mDlConcurrency->value();
-    cfg.ulConcurrency = ui->mUlConcurrency->value();
-    cfg.batchSize = ui->mBatchSize->value();
-    cfg.aria2cConnections = ui->mAria2cConns->value();
-    cfg.tempDir = ui->mTempDir->text();
-    cfg.downloadsDir = ui->mDownloadsDir->text();
-    cfg.keepFiles = ui->mKeepFiles->isChecked();
-    cfg.downloadRetryDelaySec = ui->mDownloadRetryDelay->value();
-    cfg.uploadRetryDelaySec = ui->mUploadRetryDelay->value();
-    cfg.diskReserveBytes = static_cast<qint64>(ui->mDiskReserveGb->value()) * 1024LL * 1024 * 1024;
-    cfg.reportRetries = ui->mReportRetries->value();
-    cfg.queuePrefetch = ui->mQueuePrefetch->value();
-    cfg.uploadChunkSize = static_cast<qint64>(ui->mUploadChunkSizeMb->value()) * 1024 * 1024;
-    cfg.uploadStartRetries = ui->mUploadStartRetries->value();
-    cfg.uploadChunkRetries = ui->mUploadChunkRetries->value();
-    cfg.uploadFinishRetries = ui->mUploadFinishRetries->value();
-    cfg.uploadRetryCap = static_cast<float>(ui->mUploadRetryCap->value());
-    cfg.uploadChunkRetryCap = static_cast<float>(ui->mUploadChunkRetryCap->value());
+    cfg.concurrency = ui->mConcurrency->value();
+    cfg.subchunkRetries = ui->mSubchunkRetries->value();
+    cfg.reconnectDelaySec = ui->mReconnectDelay->value();
 
-    ui->mUploadTable->setRowCount(0);
-    ui->mDownloadTable->setRowCount(0);
+    ui->mChunksTable->setRowCount(0);
     mProgressBars.clear();
-    mUploadRowIndex.clear();
-    mDownloadRowIndex.clear();
-    mQueuedUploadCount = 0;
-    mQueuedDownloadCount = 0;
-    ui->mUploadQueueLabel->setText("Upload Queue (0)");
-    ui->mDownloadQueueLabel->setText("Download Queue (0)");
-    mLiveDownloadProgress.clear();
-    mLiveUploadProgress.clear();
+    mChunkRowIndex.clear();
+    mLiveProgress.clear();
     mPendingRemovals.clear();
 
     if (!resuming)
@@ -1160,12 +983,9 @@ void MainWindow::OnStart()
         mStartTime = QDateTime::currentDateTime();
         mBytesDown = 0;
         mBytesUp = 0;
-        mPrevDlTotal = 0;
-        mPrevUlTotal = 0;
-        mSmoothDlSpeed = 0.0;
-        mSmoothUlSpeed = 0.0;
-        ui->mDlSpeedLabel->setText("--");
-        ui->mUlSpeedLabel->setText("--");
+        mPrevTotal = 0;
+        mSmoothSpeed = 0.0;
+        ui->mSpeedLabel->setText("--");
         ui->mFinishedTable->setRowCount(0);
         mFinishedDoneCount = 0;
         mFinishedFailCount = 0;
@@ -1186,7 +1006,6 @@ void MainWindow::OnPause()
     }
     mPaused = true;
     mWorker->Stop();
-    AppendLog("Worker paused.");
 }
 
 void MainWindow::OnStop()
@@ -1198,17 +1017,10 @@ void MainWindow::OnStop()
 
     mPaused = false;
 
-    ui->mUploadTable->setRowCount(0);
-    ui->mDownloadTable->setRowCount(0);
+    ui->mChunksTable->setRowCount(0);
     mProgressBars.clear();
-    mUploadRowIndex.clear();
-    mDownloadRowIndex.clear();
-    mQueuedUploadCount = 0;
-    mQueuedDownloadCount = 0;
-    ui->mUploadQueueLabel->setText("Upload Queue (0)");
-    ui->mDownloadQueueLabel->setText("Download Queue (0)");
-
-    AppendLog("Worker stopped.");
+    mChunkRowIndex.clear();
+    ui->mChunksLabel->setText("Active Chunks");
 }
 
 void MainWindow::OnLogin()
@@ -1230,6 +1042,7 @@ void MainWindow::OnLogout()
         QMessageBox::warning(this, "Worker Running", "Stop the worker before logging out.");
         return;
     }
+    mWorker->CloseConnection();
     QFile::remove(MinervaWorker::TokenPathLocal());
     QFile::remove(avatarCachePath());
     mLoggedInUsername.clear();
@@ -1238,24 +1051,6 @@ void MainWindow::OnLogout()
     ui->mVerifiedLabel->setText("--");
     RefreshLoginLabel();
     AppendLog("Logged out. Token and avatar cache removed.");
-}
-
-void MainWindow::OnBrowseTempDir()
-{
-    QString dir = QFileDialog::getExistingDirectory(this, "Select Temp Directory", ui->mTempDir->text());
-    if (!dir.isEmpty())
-    {
-        ui->mTempDir->setText(dir);
-    }
-}
-
-void MainWindow::OnBrowseDownloadsDir()
-{
-    QString dir = QFileDialog::getExistingDirectory(this, "Select Downloads Directory", ui->mDownloadsDir->text());
-    if (!dir.isEmpty())
-    {
-        ui->mDownloadsDir->setText(dir);
-    }
 }
 
 void MainWindow::OnCheckServers()
@@ -1276,16 +1071,6 @@ void MainWindow::OnCheckServers()
             dot = "<span style='color:#f39c12;'>\u25CF</span>";
             text = QString(" %1 Unauthorized (need login)").arg(code);
         }
-        else if (code == 405)
-        {
-            dot = "<span style='color:#27ae60;'>\u25CF</span>";
-            text = QString(" %1 Reachable").arg(code);
-        }
-        else if (code == 426)
-        {
-            dot = "<span style='color:#f39c12;'>\u25CF</span>";
-            text = QString(" %1 Reachable (upgrade required)").arg(code);
-        }
         else if (code > 0)
         {
             dot = "<span style='color:#c0392b;'>\u25CF</span>";
@@ -1299,19 +1084,13 @@ void MainWindow::OnCheckServers()
         lbl->setText(dot + text);
     };
 
-    QString apiBase = ui->mServerUrl->text().trimmed();
-    QString gateBase = ui->mUploadUrl->text().trimmed();
-    QString token = MinervaWorker::LoadToken();
-
+    QString apiBase = HyperscrapeProtocol::ApiBaseFromWsUrl(ui->mFirehoseUrl->text().trimmed());
     QNetworkAccessManager *nam = mAvatarNam;
 
-    struct Endpoint { QString url; QLabel *label; bool needsAuth; bool useHead; };
+    struct Endpoint { QString url; QLabel *label; };
     QVector<Endpoint> endpoints = {
-                                   { apiBase + "/worker/version",  ui->mStatusApiVersion,     false, false },
-                                   { apiBase + "/api/jobs?count=0", ui->mStatusApiJobs,       true,  false },
-                                   { apiBase + "/api/jobs/report", ui->mStatusApiReport,      true,  true  },
-                                   { apiBase + "/api/leaderboard", ui->mStatusApiLeaderboard, false, false },
-                                   { gateBase + "/api/upload/0/start", ui->mStatusGateUpload, true,  true  },
+                                   { apiBase + "/api/leaderboard", ui->mStatusApiLeaderboard },
+                                   { apiBase + "/api/stats", ui->mStatusApiStats },
                                    };
 
     int *pending = new int(endpoints.size());
@@ -1332,23 +1111,14 @@ void MainWindow::OnCheckServers()
 
         QNetworkRequest req(QUrl(ep.url));
         req.setTransferTimeout(10000);
-        req.setRawHeader("X-Minerva-Worker-Version", APP_VERSION);
-        if (ep.needsAuth && !token.isEmpty())
-        {
-            req.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
-        }
 
-        QNetworkReply *reply = ep.useHead ? nam->head(req) : nam->get(req);
+        QNetworkReply *reply = nam->get(req);
         QLabel *lbl = ep.label;
         connect(reply, &QNetworkReply::finished, this, [reply, lbl, setStatus, checkDone]()
                 {
                     reply->deleteLater();
                     int code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
                     QString err = reply->errorString();
-                    if (code == 0 && reply->error() != QNetworkReply::NoError)
-                    {
-                        err = reply->errorString();
-                    }
                     setStatus(lbl, code, err);
                     checkDone();
                 });
@@ -1362,12 +1132,7 @@ void MainWindow::OnRecommendedSettings()
         mProfiler = new SystemProfiler(this);
     }
 
-    QString tempPath = ui->mTempDir->text().trimmed();
-    if (tempPath.isEmpty())
-    {
-        tempPath = QCoreApplication::applicationDirPath() + "/temp";
-    }
-    SystemInfo sysInfo = mProfiler->DetectSystemInfo(tempPath);
+    SystemInfo sysInfo = mProfiler->DetectSystemInfo(".");
 
     QDialog *dlg = new QDialog(this);
     dlg->setWindowTitle("Recommended Settings");
@@ -1384,13 +1149,6 @@ void MainWindow::OnRecommendedSettings()
         sysForm->addRow("RAM:", new QLabel(QString("%1 total, %2 available")
                                                .arg(fmtBytes(sysInfo.totalRamBytes))
                                                .arg(fmtBytes(sysInfo.availRamBytes))));
-    }
-    sysForm->addRow("Disk Type:", new QLabel(sysInfo.diskType));
-    if (sysInfo.diskTotalBytes > 0)
-    {
-        sysForm->addRow("Disk Space:", new QLabel(QString("%1 free of %2")
-                                                      .arg(fmtBytes(sysInfo.diskFreeBytes))
-                                                      .arg(fmtBytes(sysInfo.diskTotalBytes))));
     }
     layout->addWidget(sysBox);
 
@@ -1426,13 +1184,7 @@ void MainWindow::OnRecommendedSettings()
     QFormLayout *recForm = new QFormLayout(recBox);
     QLabel *recConcurrency = new QLabel("--");
     recConcurrency->setStyleSheet("font-weight: bold;");
-    QLabel *recBatch = new QLabel("--");
-    recBatch->setStyleSheet("font-weight: bold;");
-    QLabel *recAria2c = new QLabel("--");
-    recAria2c->setStyleSheet("font-weight: bold;");
     recForm->addRow("Concurrency:", recConcurrency);
-    recForm->addRow("Batch Size:", recBatch);
-    recForm->addRow("aria2c Connections:", recAria2c);
     layout->addWidget(recBox);
 
     QHBoxLayout *btnRow = new QHBoxLayout;
@@ -1462,7 +1214,7 @@ void MainWindow::OnRecommendedSettings()
             });
 
     connect(mProfiler, &SystemProfiler::SpeedTestFinished, dlg,
-            [sysInfo, dlSpeedVal, ulSpeedVal, recConcurrency, recBatch, recAria2c,
+            [sysInfo, dlSpeedVal, ulSpeedVal, recConcurrency,
              runSpeedBtn, applyBtn, rec](const SpeedTestResult &result)
             {
                 dlSpeedVal->setText(QString("%1 Mbps").arg(result.downloadMbps, 0, 'f', 1));
@@ -1471,19 +1223,14 @@ void MainWindow::OnRecommendedSettings()
 
                 *rec = SystemProfiler::Calculate(sysInfo, result);
                 recConcurrency->setText(QString::number(rec->concurrency));
-                recBatch->setText(QString::number(rec->batchSize));
-                recAria2c->setText(QString::number(rec->aria2cConnections));
                 applyBtn->setEnabled(true);
             });
 
     connect(applyBtn, &QPushButton::clicked, dlg, [this, dlg, rec]()
             {
-                ui->mDlConcurrency->setValue(rec->concurrency);
-                ui->mUlConcurrency->setValue(rec->concurrency);
-                ui->mBatchSize->setValue(rec->batchSize);
-                ui->mAria2cConns->setValue(rec->aria2cConnections);
-                AppendLog(QString("Applied recommended settings: dl=%1, ul=%1, batch=%2, aria2c=%3")
-                              .arg(rec->concurrency).arg(rec->batchSize).arg(rec->aria2cConnections));
+                ui->mConcurrency->setValue(rec->concurrency);
+                AppendLog(QString("Applied recommended settings: concurrency=%1")
+                              .arg(rec->concurrency));
                 dlg->accept();
             });
 
@@ -1509,6 +1256,7 @@ void MainWindow::OnRefreshLeaderboard()
     {
         LbRefreshVisible();
     }
+    FetchNetworkStats();
     StartRefreshCooldown();
 }
 
@@ -1534,183 +1282,44 @@ void MainWindow::UpdateUptime()
                               .arg(s, 2, 10, QChar('0')));
 
     {
-        std::function<QString(double)> fmtSpeed = [](double bps) -> QString
+        qint64 liveTotal = mBytesUp;
+        for (QMap<int, qint64>::const_iterator it = mLiveProgress.constBegin(); it != mLiveProgress.constEnd(); ++it)
         {
-            if (bps < 1024)
-            {
-                return QString::number(static_cast<int>(bps)) + " B/s";
-            }
-            if (bps < 1024 * 1024)
-            {
-                return QString::number(bps / 1024, 'f', 1) + " KB/s";
-            }
-            if (bps < 1024LL * 1024 * 1024)
-            {
-                return QString::number(bps / (1024 * 1024), 'f', 2) + " MB/s";
-            }
-            return QString::number(bps / (1024LL * 1024 * 1024), 'f', 2) + " GB/s";
-        };
-
-        qint64 liveDl = mBytesDown;
-        for (QMap<int, qint64>::const_iterator it = mLiveDownloadProgress.constBegin(); it != mLiveDownloadProgress.constEnd(); ++it)
-        {
-            liveDl += it.value();
-        }
-        qint64 liveUl = mBytesUp;
-        for (QMap<int, qint64>::const_iterator it = mLiveUploadProgress.constBegin(); it != mLiveUploadProgress.constEnd(); ++it)
-        {
-            liveUl += it.value();
+            liveTotal += it.value();
         }
 
-        double instDl = std::max(0.0, static_cast<double>(liveDl - mPrevDlTotal));
-        double instUl = std::max(0.0, static_cast<double>(liveUl - mPrevUlTotal));
-        mPrevDlTotal = liveDl;
-        mPrevUlTotal = liveUl;
+        double inst = std::max(0.0, static_cast<double>(liveTotal - mPrevTotal));
+        mPrevTotal = liveTotal;
 
         constexpr double alpha = 0.3;
-        mSmoothDlSpeed = alpha * instDl + (1.0 - alpha) * mSmoothDlSpeed;
-        mSmoothUlSpeed = alpha * instUl + (1.0 - alpha) * mSmoothUlSpeed;
+        mSmoothSpeed = alpha * inst + (1.0 - alpha) * mSmoothSpeed;
 
-        ui->mDlSpeedLabel->setText(fmtSpeed(mSmoothDlSpeed));
-        ui->mUlSpeedLabel->setText(fmtSpeed(mSmoothUlSpeed));
-
-        ui->mDownloadedLabel->setText(fmtBytes(liveDl));
-        ui->mUploadedLabel->setText(fmtBytes(liveUl));
+        ui->mSpeedLabel->setText(fmtSpeed(mSmoothSpeed));
+        ui->mStreamedLabel->setText(fmtBytes(liveTotal));
     }
 
     {
-        int ulActive = ui->mUploadTable->rowCount();
-        if (mQueuedUploadCount > 0)
-        {
-            ui->mUploadQueueLabel->setText(QString("Upload Queue (%1 + %2 queued)").arg(ulActive).arg(mQueuedUploadCount));
-        }
-        else
-        {
-            ui->mUploadQueueLabel->setText(QString("Upload Queue (%1)").arg(ulActive));
-        }
-
-        int dlActive = ui->mDownloadTable->rowCount();
-        if (mQueuedDownloadCount > 0)
-        {
-            ui->mDownloadQueueLabel->setText(QString("Download Queue (%1 + %2 queued)").arg(dlActive).arg(mQueuedDownloadCount));
-        }
-        else
-        {
-            ui->mDownloadQueueLabel->setText(QString("Download Queue (%1)").arg(dlActive));
-        }
+        int active = ui->mChunksTable->rowCount();
+        ui->mChunksLabel->setText(QString("Active Chunks (%1)").arg(active));
     }
-
-    {
-        qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-        QMap<int, QPair<qint64, JobState>>::iterator it = mPendingRemovals.begin();
-        while (it != mPendingRemovals.end())
-        {
-            if (nowMs - it.value().first < 3000)
-            {
-                ++it;
-                continue;
-            }
-            int fid = it.key();
-            JobState captured = it.value().second;
-            mProgressBars.remove(fid);
-            if (mUploadRowIndex.contains(fid))
-            {
-                ui->mUploadTable->removeRow(mUploadRowIndex.value(fid)->row());
-                mUploadRowIndex.remove(fid);
-            }
-            else if (mDownloadRowIndex.contains(fid))
-            {
-                ui->mDownloadTable->removeRow(mDownloadRowIndex.value(fid)->row());
-                mDownloadRowIndex.remove(fid);
-            }
-            AddFinishedRow(fid, captured);
-            it = mPendingRemovals.erase(it);
-        }
-    }
-}
-
-void MainWindow::UpdateDiskUsage()
-{
-    std::function<QString(const QString &)> diskForPath = [](const QString &path) -> QString
-    {
-        if (path.isEmpty())
-        {
-            return "N/A";
-        }
-
-        QString abs = QFileInfo(path).absoluteFilePath();
-
-        QStorageInfo si(abs);
-        if (si.isValid() && si.bytesTotal() > 0)
-        {
-            return QString("%1 free")
-            .arg(fmtBytes(si.bytesAvailable()));
-        }
-
-        QStorageInfo best;
-        for (const QStorageInfo &vol : QStorageInfo::mountedVolumes())
-        {
-            if (!vol.isValid() || vol.bytesTotal() <= 0)
-            {
-                continue;
-            }
-            if (abs.startsWith(vol.rootPath()) &&
-                vol.rootPath().length() > best.rootPath().length())
-            {
-                best = vol;
-            }
-        }
-        if (best.isValid())
-        {
-            return QString("%1 free")
-            .arg(fmtBytes(best.bytesAvailable()));
-        }
-        return "N/A";
-    };
-
-    QString tempPath = ui->mTempDir->text().trimmed();
-    if (tempPath.isEmpty())
-    {
-        tempPath = QCoreApplication::applicationDirPath() + "/temp";
-    }
-    ui->mTempDiskLabel->setText(diskForPath(tempPath));
-
-    QString dlPath = ui->mDownloadsDir->text().trimmed();
-    if (dlPath.isEmpty())
-    {
-        dlPath = QCoreApplication::applicationDirPath() + "/downloads";
-    }
-    ui->mDlDiskLabel->setText(diskForPath(dlPath));
 }
 
 void MainWindow::SyncQueueColumns()
 {
-    int tableW = ui->mUploadTable->viewport()->width();
-    if (tableW <= 0)
-    {
-        tableW = ui->mDownloadTable->viewport()->width();
-    }
+    int tableW = ui->mChunksTable->viewport()->width();
     if (tableW <= 0)
     {
         return;
     }
 
-    int remaining = tableW - 50 - 90 - 36;
+    int remaining = tableW - 80 - 100 - 80;
     if (remaining < 300)
     {
         return;
     }
 
-    int progressW = static_cast<int>(remaining * 0.38);
-    progressW = std::max(progressW, 200);
-    int statusW = std::max(remaining - progressW - static_cast<int>(remaining * 0.40), 120);
-
-    for (QTableWidget *table : {ui->mUploadTable, ui->mDownloadTable})
-    {
-        table->setColumnWidth(3, progressW);
-        table->setColumnWidth(4, statusW);
-        table->setColumnWidth(5, 36);
-    }
+    int statusW = std::max(remaining / 3, 120);
+    ui->mChunksTable->setColumnWidth(4, statusW);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *aEvent)
@@ -1737,133 +1346,76 @@ void MainWindow::RefreshLoginLabel()
 
 void MainWindow::FetchUserProfile(const QString &aToken)
 {
-    QStringList parts = aToken.split('.');
-    if (parts.size() < 2)
+    if (aToken.isEmpty())
     {
-        AppendLog("[JWT] Token is not a valid JWT (no dots)");
         return;
     }
 
-    QByteArray payload = parts[1].toUtf8();
-    payload.replace('-', '+');
-    payload.replace('_', '/');
-    while (payload.size() % 4 != 0)
+    QNetworkRequest req(QUrl(QStringLiteral("https://discord.com/api/users/@me")));
+    req.setRawHeader("Authorization", ("Bearer " + aToken).toUtf8());
+    req.setTransferTimeout(10000);
+
+    QNetworkReply *reply = mAvatarNam->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]()
     {
-        payload.append('=');
-    }
-
-    QByteArray decoded = QByteArray::fromBase64(payload);
-    QJsonDocument doc = QJsonDocument::fromJson(decoded);
-    QJsonObject obj = doc.object();
-
-    AppendLog(QString("[JWT] Payload keys: %1").arg(QStringList(obj.keys()).join(", ")));
-    AppendLog(QString("[JWT] Payload: %1").arg(QString::fromUtf8(decoded).left(500)));
-
-    QString username;
-    for (const auto &key : {"discord_username", "username", "name", "sub", "preferred_username"})
-    {
-        username = obj.value(key).toString();
-        if (!username.isEmpty())
-        {
-            break;
-        }
-    }
-    if (!username.isEmpty())
-    {
-        mLoggedInUsername = username;
-        ui->mLoginLabel->setText(username);
-    }
-
-    QString avatarUrl;
-    for (const auto &key : {"avatar_url", "discord_avatar_url", "picture"})
-    {
-        avatarUrl = obj.value(key).toString();
-        if (!avatarUrl.isEmpty())
-        {
-            break;
-        }
-    }
-
-    if (avatarUrl.isEmpty())
-    {
-        QString discordId;
-        for (const auto &key : {"discord_id", "id", "user_id", "sub"})
-        {
-            discordId = obj.value(key).toString();
-            if (discordId.isEmpty())
-            {
-                if (obj.value(key).isDouble())
-                {
-                    discordId = QString::number(obj.value(key).toInteger());
-                }
-            }
-            if (!discordId.isEmpty())
-            {
-                break;
-            }
-        }
-        QString avatarHash;
-        for (const auto &key : {"avatar", "avatar_hash", "discord_avatar"})
-        {
-            avatarHash = obj.value(key).toString();
-            if (!avatarHash.isEmpty())
-            {
-                break;
-            }
-        }
-        if (!discordId.isEmpty() && !avatarHash.isEmpty())
-        {
-            QString ext = avatarHash.startsWith("a_") ? "gif" : "png";
-            avatarUrl = QString("https://cdn.discordapp.com/avatars/%1/%2.%3")
-                            .arg(discordId, avatarHash, ext);
-        }
-        AppendLog(QString("[JWT] Discord ID: %1, Avatar hash: %2")
-                      .arg(discordId.isEmpty() ? "(empty)" : discordId)
-                      .arg(avatarHash.isEmpty() ? "(empty)" : avatarHash));
-    }
-
-    AppendLog(QString("[JWT] Username: %1, Avatar: %2")
-                  .arg(username.isEmpty() ? "(empty)" : username)
-                  .arg(avatarUrl.isEmpty() ? "(empty)" : avatarUrl));
-
-    std::function<void(const QByteArray &)> showAndCache = [this](const QByteArray &imgData)
-    {
-        QPixmap pm;
-        pm.loadFromData(imgData);
-        if (pm.isNull())
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError)
         {
             return;
         }
-        pm = pm.scaled(28, 28, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        pm.save(avatarCachePath(), "PNG");
-        ui->mUserAvatar->setPixmap(pm);
-        ui->mUserAvatar->show();
-    };
 
-    QPixmap cached;
-    if (cached.load(avatarCachePath()))
-    {
-        cached = cached.scaled(28, 28, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        ui->mUserAvatar->setPixmap(cached);
-        ui->mUserAvatar->show();
-    }
+        QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+        QString username = obj.value("global_name").toString();
+        if (username.isEmpty())
+        {
+            username = obj.value("username").toString();
+        }
+        QString discordId = obj.value("id").toString();
+        QString avatarHash = obj.value("avatar").toString();
 
-    if (!avatarUrl.isEmpty())
-    {
-        QNetworkRequest avatarReq{QUrl(avatarUrl)};
-        avatarReq.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                               QNetworkRequest::NoLessSafeRedirectPolicy);
-        QNetworkReply *avatarReply = mAvatarNam->get(avatarReq);
-        connect(avatarReply, &QNetworkReply::finished, this, [this, avatarReply, showAndCache]()
+        if (!username.isEmpty())
+        {
+            mLoggedInUsername = username;
+            ui->mLoginLabel->setText(username);
+        }
+
+        QPixmap cached;
+        if (cached.load(avatarCachePath()))
+        {
+            cached = cached.scaled(28, 28, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            ui->mUserAvatar->setPixmap(cached);
+            ui->mUserAvatar->show();
+        }
+
+        if (!discordId.isEmpty() && !avatarHash.isEmpty())
+        {
+            QString ext = avatarHash.startsWith("a_") ? "gif" : "png";
+            QString avatarUrl = QString("https://cdn.discordapp.com/avatars/%1/%2.%3")
+                                    .arg(discordId, avatarHash, ext);
+            QNetworkRequest avatarReq{QUrl(avatarUrl)};
+            avatarReq.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                   QNetworkRequest::NoLessSafeRedirectPolicy);
+            QNetworkReply *avatarReply = mAvatarNam->get(avatarReq);
+            connect(avatarReply, &QNetworkReply::finished, this, [this, avatarReply]()
+            {
+                avatarReply->deleteLater();
+                if (avatarReply->error() != QNetworkReply::NoError)
                 {
-                    avatarReply->deleteLater();
-                    if (avatarReply->error() != QNetworkReply::NoError)
-                    {
-                        return;
-                    }
-                    showAndCache(avatarReply->readAll());
-                });
-    }
+                    return;
+                }
+                QPixmap pm;
+                pm.loadFromData(avatarReply->readAll());
+                if (pm.isNull())
+                {
+                    return;
+                }
+                pm = pm.scaled(28, 28, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                pm.save(avatarCachePath(), "PNG");
+                ui->mUserAvatar->setPixmap(pm);
+                ui->mUserAvatar->show();
+            });
+        }
+    });
 }
 
 
@@ -1893,27 +1445,12 @@ void MainWindow::SetRunningUi(bool aRunning)
     }
 
     bool settingsEnabled = !aRunning && !mPaused;
+    ui->mFirehoseUrl->setEnabled(settingsEnabled);
     ui->mServerUrl->setEnabled(settingsEnabled);
-    ui->mUploadUrl->setEnabled(settingsEnabled);
-    ui->mTempDir->setEnabled(settingsEnabled);
-    ui->mDownloadsDir->setEnabled(settingsEnabled);
-    ui->mKeepFiles->setEnabled(settingsEnabled);
     ui->mRecommendBtn->setEnabled(settingsEnabled);
-    ui->mDlConcurrency->setEnabled(settingsEnabled || aRunning);
-    ui->mUlConcurrency->setEnabled(settingsEnabled || aRunning);
-    ui->mBatchSize->setEnabled(settingsEnabled || aRunning);
-    ui->mAria2cConns->setEnabled(settingsEnabled || aRunning);
-    ui->mDownloadRetryDelay->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadRetryDelay->setEnabled(settingsEnabled || aRunning);
-    ui->mDiskReserveGb->setEnabled(settingsEnabled || aRunning);
-    ui->mReportRetries->setEnabled(settingsEnabled || aRunning);
-    ui->mQueuePrefetch->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadChunkSizeMb->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadStartRetries->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadChunkRetries->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadFinishRetries->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadRetryCap->setEnabled(settingsEnabled || aRunning);
-    ui->mUploadChunkRetryCap->setEnabled(settingsEnabled || aRunning);
+    ui->mConcurrency->setEnabled(settingsEnabled || aRunning);
+    ui->mSubchunkRetries->setEnabled(settingsEnabled || aRunning);
+    ui->mReconnectDelay->setEnabled(settingsEnabled || aRunning);
     ui->mUiUpdateInterval->setEnabled(settingsEnabled || aRunning);
     if (!aRunning)
     {
@@ -1924,38 +1461,11 @@ void MainWindow::SetRunningUi(bool aRunning)
 void MainWindow::LoadSettings()
 {
     QSettings s(QCoreApplication::applicationDirPath() + "/MinervaStation.ini", QSettings::IniFormat);
+    ui->mFirehoseUrl->setText(s.value("firehoseUrl", "wss://firehose.minerva-archive.org/worker").toString());
     ui->mServerUrl->setText(s.value("serverUrl", "https://api.minerva-archive.org").toString());
-    ui->mUploadUrl->setText(s.value("uploadUrl", "https://gate.minerva-archive.org").toString());
-    ui->mDlConcurrency->setValue(s.value("dlConcurrency", s.value("concurrency", 5).toInt()).toInt());
-    ui->mUlConcurrency->setValue(s.value("ulConcurrency", 5).toInt());
-    ui->mBatchSize->setValue(s.value("batchSize", 10).toInt());
-    ui->mAria2cConns->setValue(s.value("aria2cConns", 8).toInt());
-    ui->mTempDir->setText(s.value("tempDir", "").toString());
-    ui->mDownloadsDir->setText(s.value("downloadsDir", "").toString());
-    ui->mKeepFiles->setChecked(s.value("keepFiles", false).toBool());
-    ui->mDownloadRetryDelay->setValue(s.value("downloadRetryDelay", 5).toInt());
-    ui->mUploadRetryDelay->setValue(s.value("uploadRetryDelay", 10).toInt());
-    {
-        int gbVal = s.value("diskReserveGb", -1).toInt();
-        if (gbVal < 0)
-        {
-            int mbVal = s.value("diskReserveMb", 50000).toInt();
-            gbVal = mbVal / 1024;
-            if (gbVal < 1 && mbVal > 0)
-            {
-                gbVal = 1;
-            }
-        }
-        ui->mDiskReserveGb->setValue(gbVal);
-    }
-    ui->mReportRetries->setValue(s.value("reportRetries", 20).toInt());
-    ui->mQueuePrefetch->setValue(s.value("queuePrefetch", 2).toInt());
-    ui->mUploadChunkSizeMb->setValue(s.value("uploadChunkSizeMb", 8).toInt());
-    ui->mUploadStartRetries->setValue(s.value("uploadStartRetries", 12).toInt());
-    ui->mUploadChunkRetries->setValue(s.value("uploadChunkRetries", 30).toInt());
-    ui->mUploadFinishRetries->setValue(s.value("uploadFinishRetries", 12).toInt());
-    ui->mUploadRetryCap->setValue(s.value("uploadRetryCap", 25.0).toDouble());
-    ui->mUploadChunkRetryCap->setValue(s.value("uploadChunkRetryCap", 20.0).toDouble());
+    ui->mConcurrency->setValue(s.value("concurrency", s.value("dlConcurrency", 5).toInt()).toInt());
+    ui->mSubchunkRetries->setValue(s.value("subchunkRetries", 5).toInt());
+    ui->mReconnectDelay->setValue(s.value("reconnectDelay", 5).toInt());
     ui->mUiUpdateInterval->setValue(s.value("uiUpdateInterval", 250).toInt());
     mUiUpdateIntervalMs = ui->mUiUpdateInterval->value();
 }
@@ -1963,26 +1473,11 @@ void MainWindow::LoadSettings()
 void MainWindow::SaveSettings()
 {
     QSettings s(QCoreApplication::applicationDirPath() + "/MinervaStation.ini", QSettings::IniFormat);
+    s.setValue("firehoseUrl", ui->mFirehoseUrl->text());
     s.setValue("serverUrl", ui->mServerUrl->text());
-    s.setValue("uploadUrl", ui->mUploadUrl->text());
-    s.setValue("dlConcurrency", ui->mDlConcurrency->value());
-    s.setValue("ulConcurrency", ui->mUlConcurrency->value());
-    s.setValue("batchSize", ui->mBatchSize->value());
-    s.setValue("aria2cConns", ui->mAria2cConns->value());
-    s.setValue("tempDir", ui->mTempDir->text());
-    s.setValue("downloadsDir", ui->mDownloadsDir->text());
-    s.setValue("keepFiles", ui->mKeepFiles->isChecked());
-    s.setValue("downloadRetryDelay", ui->mDownloadRetryDelay->value());
-    s.setValue("uploadRetryDelay", ui->mUploadRetryDelay->value());
-    s.setValue("diskReserveGb", ui->mDiskReserveGb->value());
-    s.setValue("reportRetries", ui->mReportRetries->value());
-    s.setValue("queuePrefetch", ui->mQueuePrefetch->value());
-    s.setValue("uploadChunkSizeMb", ui->mUploadChunkSizeMb->value());
-    s.setValue("uploadStartRetries", ui->mUploadStartRetries->value());
-    s.setValue("uploadChunkRetries", ui->mUploadChunkRetries->value());
-    s.setValue("uploadFinishRetries", ui->mUploadFinishRetries->value());
-    s.setValue("uploadRetryCap", ui->mUploadRetryCap->value());
-    s.setValue("uploadChunkRetryCap", ui->mUploadChunkRetryCap->value());
+    s.setValue("concurrency", ui->mConcurrency->value());
+    s.setValue("subchunkRetries", ui->mSubchunkRetries->value());
+    s.setValue("reconnectDelay", ui->mReconnectDelay->value());
     s.setValue("uiUpdateInterval", ui->mUiUpdateInterval->value());
 }
 
@@ -2026,6 +1521,12 @@ void MainWindow::FlushLogMessages()
     const QString &last = batch.last();
     int prefixLen = 11;
     statusBar()->showMessage(last.mid(prefixLen), 10000);
+}
+
+void MainWindow::FetchNetworkStats()
+{
+    QString apiBase = HyperscrapeProtocol::ApiBaseFromWsUrl(ui->mFirehoseUrl->text());
+    mWorker->FetchStats(apiBase);
 }
 
 void MainWindow::closeEvent(QCloseEvent *aEvent)

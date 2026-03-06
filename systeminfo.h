@@ -10,9 +10,6 @@ struct SystemInfo
     QString osName;
     qint64 totalRamBytes = 0;
     qint64 availRamBytes = 0;
-    QString diskType;
-    qint64 diskTotalBytes = 0;
-    qint64 diskFreeBytes = 0;
 };
 
 #endif // SYSTEMINFO_H

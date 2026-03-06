@@ -5,10 +5,11 @@
 
 struct JobInfo
 {
-    int fileId = 0;
+    QString chunkId;
+    QString fileId;
     QString url;
-    QString destPath;
-    qint64 size = 0;
+    quint64 rangeStart = 0;
+    quint64 rangeEnd = 0;
 };
 
 #endif // JOBINFO_H

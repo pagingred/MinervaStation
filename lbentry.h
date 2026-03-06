@@ -8,7 +8,7 @@ struct LbEntry
     int rank = 0;
     QString username;
     qint64 bytes = 0;
-    int files = 0;
+    int chunks = 0;
     QString avatarUrl;
 };
 

@@ -18,7 +18,7 @@ class SystemProfiler : public QObject
 public:
     explicit SystemProfiler(QObject *aParent = nullptr);
 
-    SystemInfo DetectSystemInfo(const QString &aTempDirPath);
+    SystemInfo DetectSystemInfo(const QString &aPath = ".");
 
     void RunSpeedTest();
     void AbortSpeedTest();
