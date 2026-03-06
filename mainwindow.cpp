@@ -60,7 +60,7 @@ static QString fmtBytes(qint64 aBytes)
 
 MainWindow::~MainWindow()
 {
-    mWorker->Stop();   // must stop before child timers are destroyed
+    mWorker->Stop();
     delete ui;
 }
 
@@ -358,7 +358,6 @@ void MainWindow::FlushJobUpdates()
         int aFileId = it.key();
         const JobState &aState = it.value();
 
-        // Skip queued items — track with counters only
         if (aState.phase == JobPhase::QueuedUpload)
         {
             if (!mUploadRowIndex.contains(aFileId))
@@ -376,7 +375,6 @@ void MainWindow::FlushJobUpdates()
             continue;
         }
 
-        // Item transitioning out of queued state — decrement counter
         if (!mUploadRowIndex.contains(aFileId) && !mDownloadRowIndex.contains(aFileId))
         {
             if (aState.phase == JobPhase::Uploading ||
@@ -428,7 +426,6 @@ void MainWindow::FlushJobUpdates()
             }
         }
 
-        // Remove from other table via hash lookup
         if (otherIndex->contains(aFileId))
         {
             int otherRow = otherIndex->value(aFileId)->row();
@@ -437,7 +434,6 @@ void MainWindow::FlushJobUpdates()
             otherIndex->remove(aFileId);
         }
 
-        // Find existing row via hash lookup
         int row = -1;
         if (targetIndex->contains(aFileId))
         {
@@ -1047,10 +1043,6 @@ void MainWindow::LbRefreshVisible()
         }
     }
 
-    // Build priority list of pages to refresh:
-    //   1. Page 1 (always — drives stats bar rank/verified)
-    //   2. User's own page (if different from 1)
-    //   3. Last-visible pages (keeps viewed data fresh even when tab is hidden)
     QVector<int> candidates;
     candidates.append(1);
     if (mLbUserPage > 1)
@@ -1065,7 +1057,6 @@ void MainWindow::LbRefreshVisible()
         }
     }
 
-    // Fetch the most stale page
     for (int page : candidates)
     {
         qint64 elapsed = now - mLbPageFetchTimes.value(page, 0);
@@ -1945,7 +1936,6 @@ void MainWindow::LoadSettings()
     ui->mDownloadRetryDelay->setValue(s.value("downloadRetryDelay", 5).toInt());
     ui->mUploadRetryDelay->setValue(s.value("uploadRetryDelay", 10).toInt());
     {
-        // Migrate old MB setting to new GB setting
         int gbVal = s.value("diskReserveGb", -1).toInt();
         if (gbVal < 0)
         {
@@ -2034,7 +2024,7 @@ void MainWindow::FlushLogMessages()
     ui->mLogView->ensureCursorVisible();
 
     const QString &last = batch.last();
-    int prefixLen = 11; // "[HH:mm:ss] " length
+    int prefixLen = 11;
     statusBar()->showMessage(last.mid(prefixLen), 10000);
 }
 
