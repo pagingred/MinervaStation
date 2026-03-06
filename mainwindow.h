@@ -40,13 +40,10 @@ private slots:
     void OnStop();
     void OnLogin();
     void OnLogout();
-    void OnBrowseTempDir();
-    void OnBrowseDownloadsDir();
     void OnRefreshLeaderboard();
     void OnCheckServers();
     void OnRecommendedSettings();
     void UpdateUptime();
-    void UpdateDiskUsage();
 
 private:
     void SetupTables();
@@ -57,7 +54,7 @@ private:
     void FetchUserProfile(const QString &aToken);
     void StartRefreshCooldown();
     void SetRunningUi(bool aRunning);
-    void AddFinishedRow(int aFileId, const JobState &aState);
+    void AddFinishedRow(int aJobIndex, const JobState &aState);
     void SyncQueueColumns();
     void AppendLog(const QString &aMsg);
     void FlushLogMessages();
@@ -67,12 +64,12 @@ private:
     void LbRefreshVisible();
     void LbFetchNextPageIfNeeded();
     void LbFetchPage(int aPage);
+    void FetchNetworkStats();
 
     Ui::MainWindow *ui;
 
     MinervaWorker *mWorker;
     QTimer *mUptimeTimer;
-    QTimer *mDiskTimer;
     QTimer *mLbTimer;
     QTimer *mLbCooldown;
     QDateTime mStartTime;
@@ -81,10 +78,7 @@ private:
     QMap<int, QProgressBar*> mProgressBars;
     QMap<int, QPair<qint64, JobState>> mPendingRemovals;
 
-    int mQueuedUploadCount = 0;
-    int mQueuedDownloadCount = 0;
-    QHash<int, QTableWidgetItem*> mUploadRowIndex;
-    QHash<int, QTableWidgetItem*> mDownloadRowIndex;
+    QHash<int, QTableWidgetItem*> mChunkRowIndex;
 
     int mFinishedDoneCount = 0;
     int mFinishedFailCount = 0;
@@ -111,13 +105,10 @@ private:
 
     qint64 mBytesDown = 0;
     qint64 mBytesUp = 0;
-    QMap<int, qint64> mLiveDownloadProgress;
-    QMap<int, qint64> mLiveUploadProgress;
+    QMap<int, qint64> mLiveProgress;
 
-    qint64 mPrevDlTotal = 0;
-    qint64 mPrevUlTotal = 0;
-    double mSmoothDlSpeed = 0.0;
-    double mSmoothUlSpeed = 0.0;
+    qint64 mPrevTotal = 0;
+    double mSmoothSpeed = 0.0;
 
     QElapsedTimer mUiClock;
     QMap<int, qint64> mLastUiUpdate;

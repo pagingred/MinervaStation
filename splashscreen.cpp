@@ -61,16 +61,13 @@ void SplashScreen::drawContents(QPainter *aPainter)
     clipPath.addRoundedRect(0, 0, WIDTH, HEIGHT, 12, 12);
     aPainter->setClipPath(clipPath);
 
-    // Background
     aPainter->setPen(Qt::NoPen);
     aPainter->setBrush(QColor(BG_COLOR));
     aPainter->drawRect(0, 0, WIDTH, HEIGHT);
 
-    // Accent stripe at top
     aPainter->setBrush(QColor(ACCENT_COLOR));
     aPainter->drawRect(0, 0, WIDTH, 6);
 
-    // App icon
     QPixmap icon(":/icon.png");
     if (!icon.isNull())
     {
@@ -78,7 +75,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
         aPainter->drawPixmap((WIDTH - 48) / 2, 30, scaled);
     }
 
-    // App title — "Minerva" in accent, "Station" in text color
     QFont titleFont("Segoe UI", 28, QFont::Bold);
     aPainter->setFont(titleFont);
     QFontMetrics titleMetrics(titleFont);
@@ -97,7 +93,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
     aPainter->setPen(QColor(TEXT_COLOR));
     aPainter->drawText(titleX + nameAW, titleY, nameB);
 
-    // Tagline
     QFont taglineFont("Segoe UI", 10);
     aPainter->setFont(taglineFont);
     aPainter->setPen(QColor(MUTED_COLOR));
@@ -106,7 +101,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
     int tagW = tagMetrics.horizontalAdvance(tagline);
     aPainter->drawText((WIDTH - tagW) / 2, titleY + 22, tagline);
 
-    // Version
     QFont verFont("Segoe UI", 9);
     aPainter->setFont(verFont);
     aPainter->setPen(QColor(MUTED_COLOR));
@@ -115,7 +109,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
     int verW = verMetrics.horizontalAdvance(version);
     aPainter->drawText((WIDTH - verW) / 2, titleY + 42, version);
 
-    // Progress bar background
     int progressX = 40;
     int progressY = HEIGHT - 80;
     int progressW = WIDTH - 80;
@@ -125,7 +118,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
     aPainter->setBrush(QColor(PANEL_COLOR));
     aPainter->drawRoundedRect(progressX, progressY, progressW, progressH, 3, 3);
 
-    // Progress bar fill
     if (mProgressMax > 0 && mProgress > 0)
     {
         int fillW = (progressW * mProgress) / mProgressMax;
@@ -139,7 +131,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
         }
     }
 
-    // Status text
     if (!mStatus.isEmpty())
     {
         QFont statusFont("Segoe UI", 9);
@@ -150,7 +141,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
         aPainter->drawText(progressX, progressY - 8, elided);
     }
 
-    // Organization + year
     QFont orgFont("Segoe UI", 8);
     aPainter->setFont(orgFont);
     aPainter->setPen(QColor(MUTED_COLOR));
@@ -163,7 +153,6 @@ void SplashScreen::drawContents(QPainter *aPainter)
     int yearW = orgMetrics.horizontalAdvance(year);
     aPainter->drawText((WIDTH - yearW) / 2, HEIGHT - 24, year);
 
-    // Border
     aPainter->setClipping(false);
     aPainter->setPen(QPen(QColor(BORDER_COLOR), 1));
     aPainter->setBrush(Qt::NoBrush);

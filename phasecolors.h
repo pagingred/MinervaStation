@@ -13,15 +13,11 @@ public:
         switch (aPhase)
         {
         case JobPhase::Uploading:
-        case JobPhase::Downloading:
             return 0;
-        case JobPhase::Reporting:
+        case JobPhase::Downloading:
             return 1;
-        case JobPhase::UploadRetryWait:
-            return 2;
-        case JobPhase::QueuedUpload:
         case JobPhase::Queued:
-            return 3;
+            return 2;
         default:
             return 99;
         }
@@ -37,23 +33,17 @@ public:
         switch (aPhase)
         {
         case JobPhase::Queued:
-            return QColor("#888888");
+            return QColor(0x888888);
         case JobPhase::Downloading:
-            return QColor("#2980b9");
-        case JobPhase::QueuedUpload:
-            return QColor("#d4a017");
+            return QColor(0x2980b9);
         case JobPhase::Uploading:
-            return QColor("#e67e22");
-        case JobPhase::UploadRetryWait:
-            return QColor("#f39c12");
+            return QColor(0xe67e22);
         case JobPhase::Done:
-            return QColor("#27ae60");
+            return QColor(0x27ae60);
         case JobPhase::Failed:
-            return QColor("#c0392b");
-        case JobPhase::Reporting:
-            return QColor("#e67e22");
+            return QColor(0xc0392b);
         }
-        return QColor("#888888");
+        return QColor(0x888888);
     }
 
     static QColor Background(JobPhase aPhase)
@@ -71,17 +61,14 @@ public:
         case JobPhase::Downloading:
             color = "#2980b9";
             break;
-        case JobPhase::QueuedUpload:
-            color = "#d4a017";
-            break;
         case JobPhase::Uploading:
             color = "#e67e22";
             break;
-        case JobPhase::UploadRetryWait:
-            color = "#f39c12";
-            break;
         case JobPhase::Done:
             color = "#27ae60";
+            break;
+        case JobPhase::Failed:
+            color = "#c0392b";
             break;
         default:
             color = "#3498db";

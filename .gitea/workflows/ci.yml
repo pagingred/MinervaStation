@@ -29,10 +29,15 @@ jobs:
       - name: Setup Qt
         shell: bash
         run: |
+          QT_WS="C:/Qt/6.11.0/msvc2022_64/lib/cmake/Qt6WebSockets"
           if [ ! -f "C:/Qt/6.11.0/msvc2022_64/bin/qmake.exe" ]; then
             echo "Qt not found, installing..."
             pip install aqtinstall
-            python3 -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 -O C:/Qt
+            python3 -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 -m qtwebsockets -O C:/Qt
+          elif [ ! -d "$QT_WS" ]; then
+            echo "Qt found but websockets module missing, installing..."
+            pip install aqtinstall
+            python3 -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 -m qtwebsockets -O C:/Qt || true
           fi
           echo "qmake: $(ls C:/Qt/6.11.0/msvc2022_64/bin/qmake.exe 2>&1)"
 
@@ -87,7 +92,11 @@ jobs:
           if [ ! -f "$QT_DIR/bin/qmake" ]; then
             echo "Qt not found at $QT_DIR, installing..."
             pip install aqtinstall || pip install --break-system-packages aqtinstall
-            python3 -m aqt install-qt linux desktop 6.11.0 linux_gcc_64 -O /opt/Qt
+            python3 -m aqt install-qt linux desktop 6.11.0 linux_gcc_64 -m qtwebsockets -O /opt/Qt
+          elif [ ! -d "$QT_DIR/lib/cmake/Qt6WebSockets" ]; then
+            echo "Qt found but websockets module missing, installing..."
+            pip install aqtinstall || pip install --break-system-packages aqtinstall
+            python3 -m aqt install-qt linux desktop 6.11.0 linux_gcc_64 -m qtwebsockets -O /opt/Qt || true
           fi
           echo "Using: $($QT_DIR/bin/qmake --version 2>&1 | head -2)"
 
@@ -119,7 +128,11 @@ jobs:
           if [ ! -f "$QT_DIR/bin/qmake" ]; then
             echo "Qt not found at $QT_DIR, installing..."
             pip3 install aqtinstall || { echo "pip3 failed, trying brew"; brew install python3 && pip3 install aqtinstall; }
-            python3 -m aqt install-qt mac desktop 6.11.0 clang_64 -O "$HOME/Qt"
+            python3 -m aqt install-qt mac desktop 6.11.0 clang_64 -m qtwebsockets -O "$HOME/Qt"
+          elif [ ! -d "$QT_DIR/lib/cmake/Qt6WebSockets" ]; then
+            echo "Qt found but websockets module missing, installing..."
+            pip3 install aqtinstall || { echo "pip3 failed, trying brew"; brew install python3 && pip3 install aqtinstall; }
+            python3 -m aqt install-qt mac desktop 6.11.0 clang_64 -m qtwebsockets -O "$HOME/Qt" || true
           fi
           echo "qmake location: $(ls $QT_DIR/bin/qmake 2>&1)"
           "$QT_DIR/bin/qmake" --version || { echo "FATAL: qmake not working"; exit 1; }

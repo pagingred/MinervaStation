@@ -83,7 +83,7 @@
       <property name="currentIndex"><number>0</number></property>
       <widget class="QWidget" name="dashTab">
        <attribute name="title"><string>Dashboard</string></attribute>
-       <layout class="QVBoxLayout" name="dashLayout" stretch="0,1">
+       <layout class="QVBoxLayout" name="dashLayout" stretch="0,0,1">
         <item>
          <widget class="QGroupBox" name="statsBox">
           <property name="title"><string>Stats</string></property>
@@ -114,26 +114,14 @@
            </item>
            <item>
             <layout class="QVBoxLayout">
-             <item><widget class="QLabel" name="labelDownloadedTitle"><property name="text"><string>Downloaded</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
-             <item><widget class="QLabel" name="mDownloadedLabel"><property name="text"><string>0 B</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+             <item><widget class="QLabel" name="labelStreamedTitle"><property name="text"><string>Streamed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mStreamedLabel"><property name="text"><string>0 B</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
             </layout>
            </item>
            <item>
             <layout class="QVBoxLayout">
-             <item><widget class="QLabel" name="labelDlSpeedTitle"><property name="text"><string>Avg DL Speed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
-             <item><widget class="QLabel" name="mDlSpeedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
-            </layout>
-           </item>
-           <item>
-            <layout class="QVBoxLayout">
-             <item><widget class="QLabel" name="labelUploadedTitle"><property name="text"><string>Uploaded</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
-             <item><widget class="QLabel" name="mUploadedLabel"><property name="text"><string>0 B</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
-            </layout>
-           </item>
-           <item>
-            <layout class="QVBoxLayout">
-             <item><widget class="QLabel" name="labelUlSpeedTitle"><property name="text"><string>Avg UL Speed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
-             <item><widget class="QLabel" name="mUlSpeedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+             <item><widget class="QLabel" name="labelSpeedTitle"><property name="text"><string>Speed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mSpeedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
             </layout>
            </item>
            <item>
@@ -142,16 +130,47 @@
              <item><widget class="QLabel" name="mUptimeLabel"><property name="text"><string>--:--:--</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
             </layout>
            </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="networkBox">
+          <property name="title"><string>Network</string></property>
+          <layout class="QHBoxLayout" name="networkLayout">
            <item>
             <layout class="QVBoxLayout">
-             <item><widget class="QLabel" name="labelTempDiskTitle"><property name="text"><string>Temp Disk</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
-             <item><widget class="QLabel" name="mTempDiskLabel"><property name="text"><string>...</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+             <item><widget class="QLabel" name="labelNetWorkersTitle"><property name="text"><string>Workers</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mNetWorkersLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 14px; font-weight: bold;</string></property></widget></item>
             </layout>
            </item>
            <item>
             <layout class="QVBoxLayout">
-             <item><widget class="QLabel" name="labelDlDiskTitle"><property name="text"><string>DL Disk</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
-             <item><widget class="QLabel" name="mDlDiskLabel"><property name="text"><string>...</string></property><property name="styleSheet"><string>font-size: 18px; font-weight: bold;</string></property></widget></item>
+             <item><widget class="QLabel" name="labelNetSpeedTitle"><property name="text"><string>Net Speed</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mNetSpeedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 14px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelNetFilesTitle"><property name="text"><string>Files</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mNetFilesLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 14px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelNetChunksTitle"><property name="text"><string>Chunks</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mNetChunksLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 14px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelNetDownloadedTitle"><property name="text"><string>Downloaded</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mNetDownloadedLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 14px; font-weight: bold;</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout">
+             <item><widget class="QLabel" name="labelNetPendingTitle"><property name="text"><string>Pending</string></property><property name="styleSheet"><string>font-size: 10px; color: #888;</string></property></widget></item>
+             <item><widget class="QLabel" name="mNetPendingLabel"><property name="text"><string>--</string></property><property name="styleSheet"><string>font-size: 14px; font-weight: bold;</string></property></widget></item>
             </layout>
            </item>
           </layout>
@@ -160,58 +179,29 @@
         <item>
          <widget class="QSplitter" name="dashSplitter">
           <property name="orientation"><enum>Qt::Vertical</enum></property>
-          <widget class="QWidget" name="mUploadWidget">
-           <layout class="QVBoxLayout" name="ulLay">
+          <widget class="QWidget" name="mChunksWidget">
+           <layout class="QVBoxLayout" name="chunksLay">
             <property name="leftMargin"><number>0</number></property>
             <property name="topMargin"><number>0</number></property>
             <property name="rightMargin"><number>0</number></property>
             <property name="bottomMargin"><number>0</number></property>
             <item>
-             <widget class="QLabel" name="mUploadQueueLabel">
-              <property name="text"><string>Upload Queue</string></property>
-              <property name="styleSheet"><string>font-weight: bold; font-size: 11px; color: #e67e22;</string></property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QTableWidget" name="mUploadTable">
-              <property name="columnCount"><number>6</number></property>
-              <property name="rowCount"><number>0</number></property>
-              <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
-              <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
-              <column><property name="text"><string>ID</string></property></column>
-              <column><property name="text"><string>Phase</string></property></column>
-              <column><property name="text"><string>File</string></property></column>
-              <column><property name="text"><string>Progress</string></property></column>
-              <column><property name="text"><string>Status</string></property></column>
-              <column><property name="text"><string/></property></column>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-          <widget class="QWidget" name="mDownloadWidget">
-           <layout class="QVBoxLayout" name="dlLay">
-            <property name="leftMargin"><number>0</number></property>
-            <property name="topMargin"><number>0</number></property>
-            <property name="rightMargin"><number>0</number></property>
-            <property name="bottomMargin"><number>0</number></property>
-            <item>
-             <widget class="QLabel" name="mDownloadQueueLabel">
-              <property name="text"><string>Download Queue</string></property>
+             <widget class="QLabel" name="mChunksLabel">
+              <property name="text"><string>Active Chunks</string></property>
               <property name="styleSheet"><string>font-weight: bold; font-size: 11px; color: #2980b9;</string></property>
              </widget>
             </item>
             <item>
-             <widget class="QTableWidget" name="mDownloadTable">
-              <property name="columnCount"><number>6</number></property>
+             <widget class="QTableWidget" name="mChunksTable">
+              <property name="columnCount"><number>5</number></property>
               <property name="rowCount"><number>0</number></property>
               <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
               <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
               <column><property name="text"><string>ID</string></property></column>
-              <column><property name="text"><string>Phase</string></property></column>
               <column><property name="text"><string>File</string></property></column>
+              <column><property name="text"><string>Phase</string></property></column>
               <column><property name="text"><string>Progress</string></property></column>
               <column><property name="text"><string>Status</string></property></column>
-              <column><property name="text"><string/></property></column>
              </widget>
             </item>
            </layout>
@@ -265,37 +255,10 @@
              <widget class="QGroupBox" name="serversBox">
               <property name="title"><string>Servers</string></property>
               <layout class="QFormLayout" name="serversForm">
-               <item row="0" column="0"><widget class="QLabel" name="labelServerUrl"><property name="text"><string>API Server:</string></property></widget></item>
-               <item row="0" column="1"><widget class="QLineEdit" name="mServerUrl"><property name="text"><string>https://api.minerva-archive.org</string></property></widget></item>
-               <item row="1" column="0"><widget class="QLabel" name="labelUploadUrl"><property name="text"><string>Upload Server:</string></property></widget></item>
-               <item row="1" column="1"><widget class="QLineEdit" name="mUploadUrl"><property name="text"><string>https://gate.minerva-archive.org</string></property></widget></item>
-              </layout>
-             </widget>
-            </item>
-            <item>
-             <widget class="QGroupBox" name="dirsBox">
-              <property name="title"><string>Directories &amp; Storage</string></property>
-              <layout class="QFormLayout" name="dirsForm">
-               <item row="0" column="0"><widget class="QLabel" name="labelTempDir"><property name="text"><string>Temp Dir:</string></property></widget></item>
-               <item row="0" column="1">
-                <layout class="QHBoxLayout" name="tempDirRow">
-                 <item><widget class="QLineEdit" name="mTempDir"/></item>
-                 <item><widget class="QPushButton" name="browseTempBtn"><property name="text"><string>Browse...</string></property></widget></item>
-                </layout>
-               </item>
-               <item row="1" column="0"><widget class="QLabel" name="labelDlDir"><property name="text"><string>Downloads Dir:</string></property></widget></item>
-               <item row="1" column="1">
-                <layout class="QHBoxLayout" name="dlDirRow">
-                 <item><widget class="QLineEdit" name="mDownloadsDir"/></item>
-                 <item><widget class="QPushButton" name="browseDlBtn"><property name="text"><string>Browse...</string></property></widget></item>
-                </layout>
-               </item>
-               <item row="2" column="0"><widget class="QLabel" name="labelDiskReserve"><property name="text"><string>Min Free Disk (GB):</string></property></widget></item>
-               <item row="2" column="1"><widget class="QSpinBox" name="mDiskReserveGb"><property name="minimum"><number>0</number></property><property name="maximum"><number>500</number></property><property name="value"><number>50</number></property><property name="toolTip"><string>Stop downloading when free disk space would drop below this amount</string></property></widget></item>
-               <item row="3" column="0"><widget class="QLabel" name="labelKeepPlaceholder"><property name="text"><string/></property></widget></item>
-               <item row="3" column="1"><widget class="QCheckBox" name="mKeepFiles"><property name="text"><string>Keep downloaded files after upload</string></property></widget></item>
-               <item row="4" column="0"><widget class="QLabel" name="labelAria2cPlaceholder"><property name="text"><string/></property></widget></item>
-               <item row="4" column="1"><widget class="QLabel" name="mAria2cLabel"><property name="text"><string/></property></widget></item>
+               <item row="0" column="0"><widget class="QLabel" name="labelFirehoseUrl"><property name="text"><string>Firehose URL:</string></property></widget></item>
+               <item row="0" column="1"><widget class="QLineEdit" name="mFirehoseUrl"><property name="text"><string>wss://firehose.minerva-archive.org/worker</string></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelServerUrl"><property name="text"><string>API Server:</string></property></widget></item>
+               <item row="1" column="1"><widget class="QLineEdit" name="mServerUrl"><property name="text"><string>https://api.minerva-archive.org</string></property></widget></item>
               </layout>
              </widget>
             </item>
@@ -303,50 +266,14 @@
              <widget class="QGroupBox" name="perfBox">
               <property name="title"><string>Performance</string></property>
               <layout class="QFormLayout" name="perfForm">
-               <item row="0" column="0"><widget class="QLabel" name="labelDlConc"><property name="text"><string>Download Concurrency:</string></property></widget></item>
-               <item row="0" column="1"><widget class="QSpinBox" name="mDlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
-               <item row="1" column="0"><widget class="QLabel" name="labelUlConc"><property name="text"><string>Upload Concurrency:</string></property></widget></item>
-               <item row="1" column="1"><widget class="QSpinBox" name="mUlConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
-               <item row="2" column="0"><widget class="QLabel" name="labelBatch"><property name="text"><string>Batch Size:</string></property></widget></item>
-               <item row="2" column="1"><widget class="QSpinBox" name="mBatchSize"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>10</number></property></widget></item>
-               <item row="3" column="0"><widget class="QLabel" name="labelAria2c"><property name="text"><string>aria2c Connections:</string></property></widget></item>
-               <item row="3" column="1"><widget class="QSpinBox" name="mAria2cConns"><property name="minimum"><number>1</number></property><property name="maximum"><number>16</number></property><property name="value"><number>8</number></property></widget></item>
-               <item row="4" column="0"><widget class="QLabel" name="labelQueuePrefetch"><property name="text"><string>Queue Prefetch:</string></property></widget></item>
-               <item row="4" column="1"><widget class="QSpinBox" name="mQueuePrefetch"><property name="minimum"><number>1</number></property><property name="maximum"><number>20</number></property><property name="value"><number>2</number></property></widget></item>
-               <item row="5" column="0"><widget class="QLabel" name="labelRecPlaceholder"><property name="text"><string/></property></widget></item>
-               <item row="5" column="1"><widget class="QPushButton" name="mRecommendBtn"><property name="text"><string>Recommended Settings</string></property><property name="toolTip"><string>Auto-detect system capabilities and run a network speed test to calculate optimal values</string></property></widget></item>
-              </layout>
-             </widget>
-            </item>
-            <item>
-             <widget class="QGroupBox" name="downloadBox">
-              <property name="title"><string>Download</string></property>
-              <layout class="QFormLayout" name="downloadForm">
-               <item row="0" column="0"><widget class="QLabel" name="labelDlRetryDelay"><property name="text"><string>Retry Delay (sec):</string></property></widget></item>
-               <item row="0" column="1"><widget class="QSpinBox" name="mDownloadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>5</number></property></widget></item>
-              </layout>
-             </widget>
-            </item>
-            <item>
-             <widget class="QGroupBox" name="uploadBox">
-              <property name="title"><string>Upload</string></property>
-              <layout class="QFormLayout" name="uploadForm">
-               <item row="0" column="0"><widget class="QLabel" name="labelUlRetryDelay"><property name="text"><string>Retry Delay (sec):</string></property></widget></item>
-               <item row="0" column="1"><widget class="QSpinBox" name="mUploadRetryDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>10</number></property></widget></item>
-               <item row="1" column="0"><widget class="QLabel" name="labelChunkSize"><property name="text"><string>Chunk Size (MB):</string></property></widget></item>
-               <item row="1" column="1"><widget class="QSpinBox" name="mUploadChunkSizeMb"><property name="minimum"><number>1</number></property><property name="maximum"><number>64</number></property><property name="value"><number>8</number></property></widget></item>
-               <item row="2" column="0"><widget class="QLabel" name="labelReportRetries"><property name="text"><string>Report Retries:</string></property></widget></item>
-               <item row="2" column="1"><widget class="QSpinBox" name="mReportRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>20</number></property></widget></item>
-               <item row="3" column="0"><widget class="QLabel" name="labelStartRetries"><property name="text"><string>Start Retries:</string></property></widget></item>
-               <item row="3" column="1"><widget class="QSpinBox" name="mUploadStartRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
-               <item row="4" column="0"><widget class="QLabel" name="labelChunkRetries"><property name="text"><string>Chunk Retries:</string></property></widget></item>
-               <item row="4" column="1"><widget class="QSpinBox" name="mUploadChunkRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>30</number></property></widget></item>
-               <item row="5" column="0"><widget class="QLabel" name="labelFinishRetries"><property name="text"><string>Finish Retries:</string></property></widget></item>
-               <item row="5" column="1"><widget class="QSpinBox" name="mUploadFinishRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>12</number></property></widget></item>
-               <item row="6" column="0"><widget class="QLabel" name="labelUlRetryCap"><property name="text"><string>Retry Cap (sec):</string></property></widget></item>
-               <item row="6" column="1"><widget class="QDoubleSpinBox" name="mUploadRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>25.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
-               <item row="7" column="0"><widget class="QLabel" name="labelChunkRetryCap"><property name="text"><string>Chunk Retry Cap (sec):</string></property></widget></item>
-               <item row="7" column="1"><widget class="QDoubleSpinBox" name="mUploadChunkRetryCap"><property name="minimum"><double>1.000000000000000</double></property><property name="maximum"><double>120.000000000000000</double></property><property name="value"><double>20.000000000000000</double></property><property name="singleStep"><double>0.500000000000000</double></property></widget></item>
+               <item row="0" column="0"><widget class="QLabel" name="labelConcurrency"><property name="text"><string>Concurrency:</string></property></widget></item>
+               <item row="0" column="1"><widget class="QSpinBox" name="mConcurrency"><property name="minimum"><number>1</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>5</number></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelSubchunkRetries"><property name="text"><string>Subchunk Retries:</string></property></widget></item>
+               <item row="1" column="1"><widget class="QSpinBox" name="mSubchunkRetries"><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>5</number></property></widget></item>
+               <item row="2" column="0"><widget class="QLabel" name="labelReconnectDelay"><property name="text"><string>Reconnect Delay (sec):</string></property></widget></item>
+               <item row="2" column="1"><widget class="QSpinBox" name="mReconnectDelay"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>5</number></property></widget></item>
+               <item row="3" column="0"><widget class="QLabel" name="labelRecPlaceholder"><property name="text"><string/></property></widget></item>
+               <item row="3" column="1"><widget class="QPushButton" name="mRecommendBtn"><property name="text"><string>Recommended Settings</string></property><property name="toolTip"><string>Auto-detect system capabilities and run a network speed test to calculate optimal values</string></property></widget></item>
               </layout>
              </widget>
             </item>
@@ -361,20 +288,14 @@
             </item>
             <item>
              <widget class="QGroupBox" name="statusBox">
-              <property name="title"><string>Server Connection Status</string></property>
+              <property name="title"><string>Connection Status</string></property>
               <layout class="QFormLayout" name="statusGrid">
-               <item row="0" column="0"><widget class="QLabel" name="labelSrvVersion"><property name="text"><string>API /worker/version:</string></property></widget></item>
-               <item row="0" column="1"><widget class="QLabel" name="mStatusApiVersion"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-               <item row="1" column="0"><widget class="QLabel" name="labelSrvJobs"><property name="text"><string>API /api/jobs:</string></property></widget></item>
-               <item row="1" column="1"><widget class="QLabel" name="mStatusApiJobs"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-               <item row="2" column="0"><widget class="QLabel" name="labelSrvReport"><property name="text"><string>API /api/jobs/report:</string></property></widget></item>
-               <item row="2" column="1"><widget class="QLabel" name="mStatusApiReport"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-               <item row="3" column="0"><widget class="QLabel" name="labelSrvLb"><property name="text"><string>API /api/leaderboard:</string></property></widget></item>
-               <item row="3" column="1"><widget class="QLabel" name="mStatusApiLeaderboard"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-               <item row="4" column="0"><widget class="QLabel" name="labelSrvGate"><property name="text"><string>Gate /api/upload:</string></property></widget></item>
-               <item row="4" column="1"><widget class="QLabel" name="mStatusGateUpload"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
-               <item row="5" column="0"><widget class="QLabel" name="labelSrvBtnPlaceholder"><property name="text"><string/></property></widget></item>
-               <item row="5" column="1"><widget class="QPushButton" name="mCheckServersBtn"><property name="text"><string>Check Servers</string></property></widget></item>
+               <item row="0" column="0"><widget class="QLabel" name="labelSrvLb"><property name="text"><string>API /api/leaderboard:</string></property></widget></item>
+               <item row="0" column="1"><widget class="QLabel" name="mStatusApiLeaderboard"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="labelSrvStats"><property name="text"><string>API /api/stats:</string></property></widget></item>
+               <item row="1" column="1"><widget class="QLabel" name="mStatusApiStats"><property name="textFormat"><enum>Qt::RichText</enum></property></widget></item>
+               <item row="2" column="0"><widget class="QLabel" name="labelSrvBtnPlaceholder"><property name="text"><string/></property></widget></item>
+               <item row="2" column="1"><widget class="QPushButton" name="mCheckServersBtn"><property name="text"><string>Check Servers</string></property></widget></item>
               </layout>
              </widget>
             </item>
@@ -455,7 +376,7 @@
           <column><property name="text"><string/></property></column>
           <column><property name="text"><string>Username</string></property></column>
           <column><property name="text"><string>Contributed</string></property></column>
-          <column><property name="text"><string>Files</string></property></column>
+          <column><property name="text"><string>Chunks</string></property></column>
          </widget>
         </item>
        </layout>
